@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BlackJack 21點 ♠️ 頂級俱樂部</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♠️</text></svg>">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root { 
+            --gold: #F5D061; --gold-dark: #C99E38; --gold-glow: rgba(245, 208, 97, 0.5);
+            --bg-dark: #0a0a0a; --panel-bg: rgba(20, 20, 25, 0.9);
+            --win-green: #00E676; --lose-red: #FF3366;
+            --table-green: radial-gradient(ellipse at top, #0A3622 0%, #03120B 100%);
+            --seat-active: rgba(255, 215, 0, 0.25);
+        }
+        
+        * { box-sizing: border-box; font-family: 'Noto Sans TC', sans-serif; }
+        body { margin: 0; background-color: var(--bg-dark); display: flex; height: 100vh; color: white; overflow: hidden; user-select: none;}
+        
+        .overlay-screen { position: absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(5,5,5,0.95); z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        .glass-panel { background: var(--panel-bg); backdrop-filter: blur(20px); border: 1px solid rgba(255,215,0,0.2); border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); padding: 30px; width: 90%; max-width: 450px; text-align: center;}
+        h1.title-gold { font-family: 'Cinzel', serif; font-size: 3em; color: var(--gold); text-shadow: 0 0 20px var(--gold-glow); margin-bottom: 20px; letter-spacing: 2px;}
+        input[type="text"], input[type="number"] { width: 100%; padding: 15px; font-size: 1.2em; border-radius: 10px; border: 1px solid rgba(255,215,0,0.3); background: rgba(0,0,0,0.6); color: var(--gold); text-align: center; margin-bottom: 15px; font-weight: bold; outline:none;}
+        button { width: 100%; padding: 15px; font-size: 1.1em; border-radius: 10px; font-weight: bold; cursor: pointer; transition: 0.2s; border: none; white-space: nowrap;}
+        .btn-primary { background: linear-gradient(to bottom, #FFDF73, #C99E38); color: #000; box-shadow: 0 5px 15px rgba(201,158,56,0.4); margin-bottom: 10px;}
+        .btn-secondary { background: linear-gradient(to bottom, #3b82f6, #1d4ed8); color: white; box-shadow: 0 5px 15px rgba(37,99,235,0.4);}
+        .btn-green { background: linear-gradient(to bottom, #2ECC71, #00C853); color: #000; }
+        .btn-red { background: linear-gradient(to bottom, #FF5252, #D32F2F); color: white; }
+        .btn-purple { background: linear-gradient(to bottom, #A855F7, #6D28D9); color: white; }
+
+        .sidebar { width: 280px; background: rgba(15,15,15,0.95); border-right: 1px solid rgba(255,215,0,0.2); padding: 20px; display: flex; flex-direction: column; z-index: 10; justify-content: space-between;}
+        .room-tag { background: rgba(201,158,56,0.1); border: 1px solid var(--gold-dark); color: var(--gold); padding: 10px; border-radius: 10px; text-align: center; margin-bottom: 15px; font-weight: 900; letter-spacing: 2px;}
+        
+        .balance-box { background: linear-gradient(45deg, #111, #222); border: 1px solid var(--gold); padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align:center;}
+        .balance-title { color: #A0A0A0; font-size: 0.85em; text-transform: uppercase; letter-spacing: 1px;}
+        .balance-val { color: var(--gold); font-size: 2em; font-weight: 900; font-family: 'Cinzel';}
+        
+        .pnl-list { flex-grow: 1; overflow-y: auto; font-weight: bold; }
+        .pnl-item { display: flex; justify-content: space-between; padding: 12px 5px; border-bottom: 1px solid rgba(255,255,255,0.05);}
+        .text-win { color: var(--win-green); }
+        .text-lose { color: var(--lose-red); }
+
+        .admin-controls { margin-top: 20px; border-top: 1px solid rgba(255,215,0,0.2); padding-top: 20px; display:flex; flex-direction:column; gap:10px;}
+
+        .main-game { flex-grow: 1; display: flex; flex-direction: column; position: relative;}
+        
+        .casino-table { 
+            flex-grow: 1; background: var(--table-green); 
+            border-radius: 40px; box-shadow: inset 0 0 100px rgba(0,0,0,1); 
+            display: flex; flex-direction: column; justify-content: space-between; 
+            padding: 20px 20px 250px 20px; 
+            position: relative;
+        }
+        
+        .table-text { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); text-align: center; opacity: 0.25; pointer-events: none;}
+        .table-text h2 { font-family: 'Cinzel'; font-size: 4em; color: white; margin: 0; letter-spacing: 5px;}
+        .table-text p { color: white; font-size: 1.5em; font-weight: bold; margin: 5px 0 0 0; font-family: sans-serif;}
+
+        .dealer-area { 
+            display: flex; flex-direction: column; align-items: center; z-index: 5; margin-top: 10px; position: relative;
+            background: rgba(0,0,0,0.3); padding: 15px 30px; border-radius: 50px; border: 2px solid rgba(255,215,0,0.1); align-self: center;
+        }
+        .dealer-title { color: var(--gold); font-family: 'Cinzel'; font-size: 1.5em; font-weight: bold; margin-bottom: 10px; text-shadow: 0 2px 5px #000; display:flex; align-items:center; justify-content:center;}
+        
+        .shoe { position: absolute; top: 30px; right: 30px; width: 80px; height: 110px; background: linear-gradient(135deg, #222, #000); border: 2px solid #444; border-radius: 12px; box-shadow: 5px 5px 15px rgba(0,0,0,0.8); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#A0A0A0; font-weight:bold; z-index: 10;}
+        .shoe .deck-count { color: var(--gold); font-size: 1.8em; font-family: 'Cinzel'; margin-bottom: 5px;}
+        .shoe .shoe-label { font-size: 0.7em; letter-spacing: 1px; color:#666;}
+
+        .seats-container { display: flex; justify-content: space-around; width: 100%; max-width: 1100px; margin: 0 auto; margin-top: auto; z-index: 5;}
+        .seat-wrapper { display:flex; flex-direction:column; align-items:center; position:relative; }
+        .seat-wrapper:nth-child(1) { transform: translateY(-160px) rotate(12deg); }
+        .seat-wrapper:nth-child(2) { transform: translateY(-110px) rotate(5deg); }
+        .seat-wrapper:nth-child(3) { transform: translateY(-80px) rotate(0deg); }
+        .seat-wrapper:nth-child(4) { transform: translateY(-110px) rotate(-5deg); }
+        .seat-wrapper:nth-child(5) { transform: translateY(-160px) rotate(-12deg); }
+
+        .seat { 
+            width: 135px; height: 160px; border: 3px solid rgba(255,215,0,0.4); border-radius: 12px; 
+            display: flex; flex-direction: column; align-items: center; position: relative; cursor: pointer; transition: 0.2s;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5); background: rgba(0,0,0,0.2);
+        }
+        .seat.selected-for-bet { background: var(--seat-active); border-color: white; box-shadow: 0 0 30px rgba(255,255,255,0.6);}
+        .seat.active-turn { border-color: var(--win-green); box-shadow: 0 0 20px rgba(0,230,118,0.5); background: rgba(0,230,118,0.1);}
+        
+        .seat-double-down { border-color: #A855F7 !important; box-shadow: 0 0 20px rgba(168, 85, 247, 0.6) !important; background: rgba(168, 85, 247, 0.15) !important; }
+
+        .seat-bust-static { border-color: var(--lose-red) !important; background: rgba(0,0,0,0.7); }
+        .seat-bust-static .bust-stamp { opacity: 1; transform: translate(-50%, -50%) rotate(-15deg) scale(1); }
+        .seat-bust-anim { animation: bust-shake 0.6s forwards; }
+        .seat-bust-anim .bust-stamp { animation: stamp-drop 0.4s ease-in forwards; }
+        
+        @keyframes bust-shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px) rotate(-5deg); background: rgba(255,51,102,0.3); }
+            50% { transform: translateX(5px) rotate(5deg); }
+            75% { transform: translateX(-5px) rotate(-5deg); }
+            100% { transform: translateX(0); background: rgba(0,0,0,0.7); border-color: var(--lose-red);}
+        }
+        
+        .bust-stamp { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-15deg); color: #FF3366; font-family: 'Cinzel'; font-size: 2.5em; font-weight: 900; text-shadow: 0 0 10px #000, 0 0 20px #FF3366; border: 4px solid #FF3366; padding: 5px 15px; border-radius: 10px; z-index: 50; pointer-events: none; opacity: 0;}
+        @keyframes stamp-drop { 0% { transform: translate(-50%, -50%) scale(2) rotate(-15deg); opacity: 0; } 100% { transform: translate(-50%, -50%) scale(1) rotate(-15deg); opacity: 1; } }
+        
+        .seat-name { position: absolute; bottom: -20px; width: 140px; text-align: center; font-weight: bold; background: rgba(0,0,0,0.8); padding: 4px; border-radius: 8px; font-size:0.9em; z-index:10;}
+        .seat-bet { position: absolute; bottom: -45px; color: var(--gold); font-weight: bold; font-size: 1.1em; z-index:10; white-space:nowrap; text-shadow: 0 2px 5px #000;}
+        
+        .seat-score { 
+            background: white; color: black; 
+            min-width: 35px; width: auto; height: 35px; padding: 0 10px; border-radius: 20px; box-sizing: border-box;
+            display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1em; border: 2px solid black; z-index: 15; white-space: nowrap;
+        }
+        .seat-score-absolute { position: absolute; right: -15px; top: -15px; }
+        
+        .bet-behind-zone {
+            position: absolute; bottom: -110px; left: 50%; transform: translateX(-50%);
+            width: 110px; height: 50px; border: 2px dashed #666; border-radius: 10px;
+            display: flex; flex-direction:column; align-items: center; justify-content: center; color: #888; font-size: 0.8em; font-weight: bold; cursor: pointer; transition: 0.2s; background: rgba(0,0,0,0.4); z-index:20;
+        }
+        .bet-behind-zone:hover, .bet-behind-zone.selected-for-bet { border-color: var(--gold); color: var(--gold); background: rgba(255,215,0,0.15); box-shadow: 0 0 15px rgba(255,215,0,0.3);}
+
+        .others-behind-list {
+            position: absolute; bottom: -150px; display: flex; flex-direction: column; align-items: center; width: 100%; z-index: 20;
+        }
+
+        .empty-seat { justify-content: center; color: rgba(255,255,255,0.5); font-weight:bold; border-style: dashed;}
+        .empty-seat:hover { background: rgba(255,215,0,0.1); border-color: var(--gold);}
+
+        /* 🚀 牌張完美置中 徹底移除 padding-left 🚀 */
+        .card-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; width: 100%; } 
+        .card { 
+            width: 65px; height: 95px; border-radius: 6px; box-shadow: -2px 2px 8px rgba(0,0,0,0.5); 
+            background: white; color: black; margin-left: -40px; position: relative;
+        }
+        .card:first-child { margin-left: 0; } 
+        
+        .card-hidden { background: repeating-linear-gradient(45deg, #1e3a8a, #1e3a8a 10px, #1e40af 10px, #1e40af 20px); border: 3px solid white;}
+        .card-hidden .card-content { display: none; }
+
+        .red-suit { color: #D32F2F; }
+        .card-corner { position: absolute; top: 2px; left: 4px; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+        .card-corner-val { font-size: 18px; font-weight: 900; }
+        .card-suit-center { font-size: 35px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.8;}
+
+        @keyframes deal-fly { 0% { transform: translate(300px, -300px) scale(0.5) rotate(180deg); opacity: 0; } 100% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; } }
+        .card-new { animation: deal-fly 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        .bj-anim { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); color: var(--gold); font-family: 'Cinzel'; font-size: 2em; font-weight: 900; text-shadow: 0 0 15px #000, 0 0 30px var(--gold); z-index: 50; pointer-events: none;}
+        @keyframes bj-pop { 0% { transform: translate(-50%, -50%) scale(0); opacity:0;} 20% { transform: translate(-50%, -50%) scale(1.3); opacity:1;} 80% { transform: translate(-50%, -50%) scale(1.1); opacity:1;} 100% { transform: translate(-50%, -50%) scale(1); opacity:0;} }
+
+        .dd-anim { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) scale(0); color: #A855F7; font-family: 'Cinzel'; font-size: 2em; font-weight: 900; text-shadow: 0 0 15px #000, 0 0 20px #A855F7; z-index: 60; pointer-events: none; white-space: nowrap;}
+        @keyframes dd-pop { 0% { transform: translate(-50%, -50%) scale(0); opacity:0;} 20% { transform: translate(-50%, -50%) scale(1.3); opacity:1;} 80% { transform: translate(-50%, -50%) scale(1.1); opacity:1;} 100% { transform: translate(-50%, -50%) scale(1); opacity:0;} }
+
+        .bottom-dock { 
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); 
+            background: rgba(10,10,10,0.85); backdrop-filter: blur(10px); border: 1px solid var(--gold); border-radius: 50px; 
+            padding: 15px 25px; display: flex; flex-direction: column; align-items: center; 
+            z-index: 100; box-shadow: 0 15px 40px rgba(0,0,0,0.9); width: auto; min-width: 350px;
+        }
+        #resultMsg { font-size: 1.1em; font-weight: 800; margin-bottom: 8px; color: var(--gold); text-shadow: 0 2px 5px #000;}
+        
+        .chips-area { display: flex; gap: 10px; justify-content: center; align-items: center;}
+        .chip { 
+            width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            font-size: 1em; font-weight: 900; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.8), inset 0 0 8px rgba(255,255,255,0.3);
+            border: 4px dashed; transition: 0.1s; user-select: none;
+        }
+        .chip:active { transform: scale(0.9); }
+        .chip-1 { background: #e2e8f0; color: #0f172a; border-color: #94a3b8;}
+        .chip-5 { background: #ef4444; color: white; border-color: #fca5a5;}
+        .chip-10 { background: #3b82f6; color: white; border-color: #93c5fd;}
+        .chip-100 { background: #111; color: var(--gold); border-color: var(--gold); box-shadow: 0 0 15px rgba(255,215,0,0.4);}
+        
+        .action-row { display: flex; gap: 10px; justify-content: center; width: 100%;}
+        .action-row button { padding: 10px 20px; font-size: 1.1em; border-radius: 30px;}
+
+        .action-timer { background: rgba(0,0,0,0.6); border: 1px solid var(--gold); color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 8px; text-align:center; font-size:0.95em;}
+
+        #shuffleOverlay { position: absolute; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.95); z-index:4000; display:none; flex-direction:column; justify-content:center; align-items:center; }
+        .shuffle-icon { font-size: 8em; animation: float 1s infinite alternate; }
+        @keyframes float { 0% { transform: translateY(0px); } 100% { transform: translateY(-20px); } }
+
+        .req-panel { position: absolute; top: 20px; left: 300px; background: rgba(0,0,0,0.8); border: 1px solid var(--gold); padding: 15px; border-radius: 10px; z-index: 100;}
+        .req-item { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px;}
+
+        .flying-chip { position: absolute; width: 35px; height: 35px; border-radius: 50%; background: var(--gold); border: 3px dashed #fff; z-index: 9999; transition: all 0.7s cubic-bezier(0.25, 0.8, 0.25, 1); pointer-events: none;}
+        .float-text { position: absolute; font-weight: 900; font-size: 2em; text-shadow: 0 2px 5px #000; z-index: 9999; animation: floatUp 1.5s ease-out forwards; pointer-events: none; white-space:nowrap;}
+        @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-50px); opacity: 0; } }
+
+        .total-pnl-popup { 
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.8); 
+            background: rgba(0,0,0,0.85); border: 2px solid var(--gold); padding: 20px 40px; 
+            border-radius: 20px; text-align: center; z-index: 8000; display: none; 
+            animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.9); pointer-events: none;
+        }
+        @keyframes popIn { 0% { transform: translateX(-50%) scale(0.5) translateY(-20px); opacity:0;} 100% { transform: translateX(-50%) scale(1) translateY(0); opacity:1;} }
+
+        .modal-item { background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%); border: 1px solid rgba(255,215,0,0.3); border-radius: 12px; padding: 15px; cursor: pointer; transition: 0.3s; text-align: left; position: relative; overflow: hidden; margin-bottom:10px;}
+        .modal-item:hover { background: rgba(255,215,0,0.1); border-color: var(--gold); transform: translateY(-2px);}
+        .modal-item.selected { background: rgba(255,215,0,0.2); border-color: var(--gold); box-shadow: 0 0 15px rgba(255,215,0,0.5);}
+        .modal-item.selected::after { content: '✅'; position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 1.5em; }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; overflow-y: auto; }
+            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--gold); padding: 10px; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center;}
+            .room-tag { margin-bottom: 0; flex: 1 1 40%; }
+            .balance-box { margin-bottom: 0; flex: 1 1 40%; }
+            .pnl-list { display: none; } 
+            .admin-controls { width: 100%; margin-top: 10px; padding-top: 10px; display: flex; gap: 10px; border-top: 1px solid #444;}
+            .admin-controls button { font-size: 0.9em; padding: 10px; margin-bottom: 0;}
+
+            .req-panel { left: 10px; top: 150px; right: 10px; }
+            
+            .casino-table { padding: 10px 5px 280px 5px; border-radius: 20px;}
+            .table-text h2 { font-size: 2em; }
+            .shoe { width: 50px; height: 75px; top:10px; right:10px;}
+            .shoe .deck-count { font-size: 1.2em;}
+            .dealer-area { padding: 10px 15px; }
+            
+            .seats-container { gap: 2px; margin-bottom: 30px;}
+            .seat-wrapper { flex: 1; display:flex; justify-content:center;}
+            .seat-wrapper:nth-child(1) { transform: translateY(-100px) rotate(12deg); }
+            .seat-wrapper:nth-child(2) { transform: translateY(-60px) rotate(5deg); }
+            .seat-wrapper:nth-child(3) { transform: translateY(-30px) rotate(0deg); }
+            .seat-wrapper:nth-child(4) { transform: translateY(-60px) rotate(-5deg); }
+            .seat-wrapper:nth-child(5) { transform: translateY(-100px) rotate(-12deg); }
+            
+            .seat { width: 90%; height: 110px; border-width: 2px;}
+            .seat-name { font-size: 0.75em; bottom: -20px; width:100%; padding:2px;}
+            .seat-bet { font-size: 0.8em; bottom: -40px;}
+            .seat-score { min-width: 24px; height: 24px; font-size: 0.85em; padding: 0 4px; border-radius: 12px;}
+            .bet-behind-zone { bottom: -70px; width: 95%; height: 35px; font-size: 0.7em;}
+            .others-behind-list { bottom: -110px; }
+            
+            .card-container { padding-left: 0; }
+            .card { width: 40px; height: 60px; margin-left: -25px;}
+            .card-corner-val { font-size: 12px; }
+            .card-suit-center { font-size: 20px; }
+            
+            .bottom-dock { width: 95%; bottom: 10px; border-radius: 25px; padding: 10px;}
+            .chip { width: 45px; height: 45px; font-size: 1em; border-width: 3px;}
+            .action-row button { padding: 8px 12px; font-size: 1em;}
+        }
+    </style>
+</head>
+<body>
+
+    <div class="overlay-screen" id="loginOverlay">
+        <h1 class="title-gold">VIP 21點 ♠️</h1>
+        <div class="glass-panel">
+            <div class="input-group">
+                <label>身份登記 (玩家暱稱)</label>
+                <input type="text" id="playerName" placeholder="例如：賭神高進" maxlength="8">
+            </div>
+            <button class="btn-primary" onclick="createRoom()">👑 建立包廂 (當莊家)</button>
+            <div style="color: #888; margin: 15px 0; font-weight:bold;">或者</div>
+            <input type="text" id="roomCodeInput" placeholder="輸入 4 碼房號" maxlength="4" style="text-transform: uppercase; letter-spacing: 8px;">
+            <button class="btn-secondary" onclick="joinRoom()">👤 加入包廂</button>
+        </div>
+    </div>
+
+    <div id="shuffleOverlay">
+        <div class="shuffle-icon">🃏</div>
+        <h2 style="color:var(--gold); margin-top:20px; letter-spacing: 2px;">更換 8 副新牌中...</h2>
+    </div>
+
+    <div class="overlay-screen" id="settleModal" style="display:none;">
+        <div class="glass-panel" style="max-width: 600px; width: 95%;">
+            <h2 style="color:var(--gold); margin-top:0; font-size: 2.5em; text-shadow: 0 0 20px var(--gold-glow); border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 15px;">🏆 終局總結算</h2>
+            <p style="color:#cbd5e1; font-size: 1.1em; margin-bottom:15px;">請室長選擇下一局的新莊家 (全場資料將清零)：</p>
+            <div id="dealerCandidateList" style="display:grid; grid-template-columns: 1fr; gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px;"></div>
+            <button class="btn-primary" style="margin-top: 20px; font-size: 1.3em;" onclick="confirmTransferDealer()">確認並重啟賭局</button>
+            <button class="btn-secondary" style="background:#555; margin-top: 5px;" onclick="document.getElementById('settleModal').style.display='none';">取消</button>
+        </div>
+    </div>
+
+    <div class="sidebar" id="mainSidebar" style="display:none;">
+        <div>
+            <div class="room-tag">房號：<span id="displayRoomId">----</span></div>
+            <div class="balance-box">
+                <div class="balance-title">YOUR BALANCE</div>
+                <div class="balance-val">$<span id="myBalanceDisplay">0</span></div>
+                <button style="margin-top:10px; background:transparent; border:1px solid var(--gold); color:var(--gold); font-size:0.9em; padding:8px;" onclick="applyChips()">🏦 向莊家申請籌碼</button>
+            </div>
+            <div style="color:#A0A0A0; font-size:0.8em; margin-bottom:5px; text-transform:uppercase;" class="pnl-list-title">Player PnL</div>
+            <div class="pnl-list" id="playerList"></div>
+        </div>
+        <div class="admin-controls" id="adminControls" style="display:none;">
+            <button class="btn-red" id="btnEndSession" onclick="if(confirm('確定要結束這場牌局並進行總結算嗎？')) socket.emit('end_session')" style="display:none; width:100%; margin-bottom:10px;">🛑 終局總結算</button>
+            <button style="background:transparent; border:1px solid #FF3366; color:#FF3366; width:100%;" onclick="if(confirm('確定強制重置牌桌？所有人的下注將被清空。')) socket.emit('force_reset')">🔄 強制重置</button>
+        </div>
+    </div>
+
+    <div class="main-game" id="mainGameArea" style="display:none;">
+        <div class="req-panel" id="chipRequestsPanel" style="display:none;">
+            <div style="color:var(--gold); font-weight:bold; margin-bottom:10px;">🔔 籌碼申請審核</div>
+            <div id="reqList"></div>
+        </div>
+
+        <div class="casino-table">
+            <div class="table-text">
+                <h2>BLACK JACK</h2>
+                <p>PAYS 3 TO 2</p>
+                <p style="font-size:0.8em; margin-top:10px;">Dealer must draw to 16 and stand on all 17s</p>
+            </div>
+
+            <div id="timerDisplay"></div>
+
+            <div class="dealer-area" id="dealerSeat">
+                <div class="dealer-title" id="dealerTitleArea">
+                    👑 莊家 <span id="dealerName"></span> 
+                    <span class="seat-score" id="dealerScore" style="position:relative; margin-left:15px; display:none;">0</span>
+                </div>
+                <div class="card-container" id="dealerCardsArea" style="min-height: 95px;"></div>
+            </div>
+
+            <div class="shoe">
+                <div class="deck-count" id="deckCountDisplay">416</div>
+                <div class="shoe-label">剩餘張數</div>
+            </div>
+
+            <div class="total-pnl-popup" id="totalPnlPopup">
+                <div style="color:#A0A0A0; font-size:0.9em; letter-spacing:2px; margin-bottom:5px;">本局總盈虧</div>
+                <div id="totalPnlAmount" style="font-size:3.5em; font-weight:900; font-family:'Cinzel';">0</div>
+            </div>
+
+            <div class="seats-container" id="seatsArea">
+                </div>
+        </div>
+
+        <div class="bottom-dock" id="masterPanel" style="display:none;">
+            <div id="resultMsg">等待開局...</div>
+            
+            <div id="actionArea" style="width: 100%;">
+                <div class="action-row" id="hostControls" style="display:none;">
+                    <button class="btn-primary" onclick="startBetting()">🚀 下一局 (10秒下注)</button>
+                </div>
+                
+                <div id="bettingControls" style="display:none; flex-direction:column; align-items:center; width:100%;">
+                    <div style="color:#FFF; font-size:0.9em; margin-bottom:10px;" id="seatIndicator">點擊發光座位下注</div>
+                    <div id="chipsActionArea" style="display:flex; flex-direction:column; align-items:center;">
+                        <div class="chips-area" style="margin-bottom:15px;">
+                            <div class="chip chip-1" onclick="addBet(1)">1</div>
+                            <div class="chip chip-5" onclick="addBet(5)">5</div>
+                            <div class="chip chip-10" onclick="addBet(10)">10</div>
+                            <div class="chip chip-100" onclick="addBet(100)">100</div>
+                        </div>
+                        <div class="action-row">
+                            <button style="background: #333; color:white; flex:0.4;" onclick="clearBet()">清空</button>
+                            <button class="btn-primary" style="flex:1;" onclick="confirmBet()">✅ 確認鎖定下注</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="insuranceControls" style="display:none; flex-direction:column; align-items:center; width:100%;">
+                    <div class="action-timer" id="insTimerText">⏳ 剩餘 10 秒</div>
+                    <div style="color:#FFF; font-size:0.9em; margin-bottom:10px;">莊家開出 A，是否為此座位購買保險？(花費原注碼一半)</div>
+                    <div class="action-row">
+                        <button class="btn-primary" onclick="emitInsurance(true)">🛡️ 買保險</button>
+                        <button class="btn-secondary" style="background:#555;" onclick="emitInsurance(false)">不買</button>
+                    </div>
+                </div>
+
+                <div id="playingControls" style="display:none; flex-direction:column; align-items:center; width:100%;">
+                    <div class="action-timer" id="actionTimerText">⏳ 剩餘 10 秒</div>
+                    <div class="action-row">
+                        <button class="btn-green" onclick="emitAction('hit')">👆 要牌</button>
+                        <button class="btn-purple" id="btnDoubleDown" style="white-space: nowrap;" onclick="emitAction('double_down')">✖️2 雙倍</button>
+                        <button class="btn-red" onclick="emitAction('stand')">🛑 停牌</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let myName = "";
+        let currentRoomId = "";
+        let amIDealer = false;
+        let amIHost = false;
+        
+        let globalState = null;
+        let selectedBetTarget = null; 
+        let selectedNextDealerId = null;
+        
+        let knownBusts = new Set();
+
+        let audioCtx = null;
+        function getAudioContext() { if (!audioCtx) { try { const AudioContext = window.AudioContext || window.webkitAudioContext; if(AudioContext) audioCtx = new AudioContext(); } catch(e) {} } return audioCtx; }
+        function unlockAudio() { const ctx = getAudioContext(); if(!ctx) return; if (ctx.state === 'suspended') ctx.resume(); try { const buffer = ctx.createBuffer(1, 1, 22050); const source = ctx.createBufferSource(); source.buffer = buffer; source.connect(ctx.destination); source.start(0); } catch(e){} }
+        ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => { document.body.addEventListener(evt, unlockAudio, { capture: true }); });
+        
+        function playTone(freq, type, duration, vol=0.1) { const ctx = getAudioContext(); if(!ctx || ctx.state !== 'running') return; try { const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, ctx.currentTime); gain.gain.setValueAtTime(vol, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration); osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + duration); } catch(e) {} }
+
+        const sfx = {
+            card: () => playTone(500, 'triangle', 0.1, 0.05),
+            win: () => { playTone(440, 'sine', 0.1, 0.1); setTimeout(()=>playTone(554, 'sine', 0.1, 0.1), 100); setTimeout(()=>playTone(659, 'sine', 0.4, 0.1), 200); }, 
+            lose: () => { playTone(300, 'sawtooth', 0.2, 0.1); setTimeout(()=>playTone(250, 'sawtooth', 0.4, 0.1), 200); },
+            chip: () => playTone(1200, 'sine', 0.05, 0.1),
+            shuffle: () => { for(let i=0; i<15; i++) setTimeout(() => playTone(600 + Math.random()*400, 'square', 0.05, 0.02), i*60); },
+            bj: () => { playTone(600, 'sine', 0.1, 0.1); setTimeout(()=>playTone(800, 'sine', 0.1, 0.1), 150); setTimeout(()=>playTone(1000, 'sine', 0.4, 0.1), 300); },
+            bust: () => { playTone(150, 'sawtooth', 0.5, 0.3); },
+            dd: () => { playTone(800, 'sine', 0.1, 0.1); setTimeout(()=>playTone(1200, 'sine', 0.3, 0.1), 100); }
+        };
+
+        function getPlayerName() { let name = document.getElementById('playerName').value.trim(); if (!name) alert("請輸入暱稱！"); return name; }
+        function createRoom() { myName = getPlayerName(); if (!myName) return; socket.emit('create_room', myName); }
+        function joinRoom() { myName = getPlayerName(); if (!myName) return; let roomId = document.getElementById('roomCodeInput').value.trim(); if (roomId.length !== 4) return alert("請輸入 4 碼房號！"); socket.emit('join_room', { playerName: myName, roomId: roomId }); }
+
+        socket.on('error_msg', (msg) => { alert(msg); });
+        socket.on('room_joined', (roomId) => {
+            currentRoomId = roomId;
+            document.getElementById('displayRoomId').innerText = roomId;
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('mainSidebar').style.display = 'flex';
+            document.getElementById('mainGameArea').style.display = 'flex';
+        });
+
+        function applyChips() {
+            unlockAudio();
+            if(amIDealer) return alert("你是莊家，擁有無限籌碼！");
+            let amt = parseInt(prompt("請輸入要向莊家申請的籌碼金額：", "1000"));
+            if(!isNaN(amt) && amt > 0) socket.emit('apply_chips', amt);
+        }
+        function handleReq(playerId, amount, isApprove) {
+            unlockAudio();
+            if(isApprove) socket.emit('approve_chips', {playerId, amount});
+            else socket.emit('reject_chips', {playerId, amount});
+        }
+
+        function handleSeatClick(index) {
+            unlockAudio();
+            if (!globalState) return;
+            let seat = globalState.seats[index];
+            
+            if (!seat) { socket.emit('take_seat', index); return; }
+
+            if (globalState.status === 'betting') {
+                if (seat.ownerId === socket.id) {
+                    if (seat.isBetConfirmed) return alert("此座位已確認鎖定下注，無法更改！"); 
+                    selectedBetTarget = { type: 'main', index: index };
+                    document.getElementById('seatIndicator').innerText = `👉 正在為 座位 ${index + 1} 佈局`;
+                    renderSeats(); 
+                } 
+            } else if (globalState.status === 'waiting' || globalState.status === 'settled') {
+                if (seat.ownerId === socket.id) {
+                    if(confirm("確定要離開這個座位嗎？(未結算籌碼將退回餘額)")) socket.emit('leave_seat', index);
+                }
+            }
+        }
+        
+        function selectBetBehind(index, event) {
+            event.stopPropagation(); 
+            unlockAudio();
+            if(!globalState || globalState.status !== 'betting' || amIDealer) return;
+            let seat = globalState.seats[index];
+            
+            if(seat && seat.ownerId !== socket.id) {
+                if(seat.bet === 0) return alert("請等待主位玩家先下注，才能買馬！");
+                if (seat.betBehind && seat.betBehind[socket.id] && seat.betBehind[socket.id].isConfirmed) return alert("此買馬已確認鎖定，無法更改！");
+                
+                selectedBetTarget = { type: 'behind', index: index };
+                let pOwner = globalState.players[seat.ownerId] || globalState.offlinePlayers.find(p => p.oldId === seat.ownerId);
+                let oName = pOwner ? pOwner.name : "玩家";
+                document.getElementById('seatIndicator').innerText = `👉 正在為 【${oName}】 買馬`;
+                renderSeats();
+            }
+        }
+
+        function startBetting() { unlockAudio(); socket.emit('start_betting'); }
+        
+        function addBet(amount) { 
+            unlockAudio(); 
+            if (!selectedBetTarget) return alert("請先點擊畫面上發光的『座位』或『買馬區』！");
+            sfx.chip(); 
+            socket.emit('add_bet', { type: selectedBetTarget.type, seatIndex: selectedBetTarget.index, amount: amount });
+        }
+        function clearBet() { 
+            unlockAudio(); 
+            if (!selectedBetTarget) return;
+            socket.emit('clear_bet', { type: selectedBetTarget.type, seatIndex: selectedBetTarget.index }); 
+        }
+        
+        function confirmBet() { 
+            unlockAudio(); 
+            if (!selectedBetTarget) return;
+            socket.emit('confirm_bet', { type: selectedBetTarget.type, seatIndex: selectedBetTarget.index });
+            selectedBetTarget = null;
+            document.getElementById('seatIndicator').innerText = `✅ 確認完畢！如有多個位子請點選下一位`;
+            renderSeats();
+        }
+
+        function emitAction(action) { unlockAudio(); socket.emit(action, globalState.currentSeatIndex); }
+        
+        function emitInsurance(buy) {
+            unlockAudio();
+            if(!globalState || globalState.status !== 'insurance') return;
+            for(let i=0; i<5; i++) {
+                let s = globalState.seats[i];
+                if(s && s.ownerId === socket.id && s.bet > 0 && s.insurance === 0) {
+                    if(buy) socket.emit('buy_insurance', { type: 'main', seatIndex: i });
+                }
+                if(s && s.betBehind && s.betBehind[socket.id] && s.betBehind[socket.id].amount > 0 && s.betBehind[socket.id].insurance === 0) {
+                    if(buy) socket.emit('buy_insurance', { type: 'behind', seatIndex: i });
+                }
+            }
+            document.getElementById('insuranceControls').style.display = 'none';
+            document.getElementById('resultMsg').innerText = buy ? "✅ 已購買保險，等待結算..." : "❌ 放棄保險，等待結算...";
+        }
+
+        function selectNextDealer(id) {
+            selectedNextDealerId = id;
+            document.querySelectorAll('.modal-item').forEach(el => el.classList.remove('selected'));
+            document.getElementById(`modal_item_${id}`).classList.add('selected');
+        }
+        function confirmTransferDealer() {
+            if(!selectedNextDealerId) return alert("請選擇一位玩家！");
+            socket.emit('change_dealer', selectedNextDealerId);
+            document.getElementById('settleModal').style.display = 'none';
+        }
+
+        function generateCardHtml(c) {
+            if (!c) return '';
+            let animClass = c.isNew ? 'card-new' : '';
+            if (c.hidden) return `<div class="card card-hidden ${animClass}"><div class="card-content"></div></div>`;
+            
+            let peekClass = c.isPeek ? 'card-peek' : '';
+            const colorClass = (c.suit === '♥' || c.suit === '♦') ? 'red-suit' : '';
+            const faces = {1:'A', 11:'J', 12:'Q', 13:'K'};
+            const displayVal = faces[c.value] || c.value;
+            return `
+                <div class="card ${animClass} ${peekClass}">
+                    <div class="card-content">
+                        <div class="card-corner ${colorClass}">
+                            <div class="card-corner-val">${displayVal}</div>
+                            <div class="card-corner-suit">${c.suit}</div>
+                        </div>
+                        <div class="card-suit-center ${colorClass}">${c.suit}</div>
+                    </div>
+                </div>`;
+        }
+
+        socket.on('shuffling_deck', () => {
+            try {
+                document.getElementById('shuffleOverlay').style.display = 'flex';
+                sfx.shuffle();
+                setTimeout(() => { document.getElementById('shuffleOverlay').style.display = 'none'; }, 3000);
+            }catch(e){}
+        });
+
+        socket.on('timer_tick', (data) => {
+            try {
+                if (data.type === 'betting') {
+                    document.getElementById('resultMsg').innerText = `⏳ 倒數 ${data.time} 秒！請點擊發光座位下注...`;
+                } else if (data.type === 'action') {
+                    document.getElementById('actionTimerText').innerText = `⏳ 剩餘 ${data.time} 秒`;
+                    document.getElementById('insTimerText').innerText = `⏳ 剩餘 ${data.time} 秒`;
+                }
+                if (data.time <= 3 && data.time > 0) playTone(800, 'square', 0.1, 0.05); 
+            }catch(e){}
+        });
+
+        socket.on('play_card_sfx', () => { sfx.card(); });
+
+        socket.on('player_blackjack', (seatIdx) => {
+            try {
+                sfx.bj();
+                let el = document.getElementById(`seat_bj_${seatIdx}`);
+                if(el) {
+                    el.innerHTML = "✨ BLACKJACK";
+                    el.style.animation = "bj-pop 2s forwards";
+                }
+            }catch(e){}
+        });
+        
+        socket.on('player_double_down', (seatIdx) => {
+            try {
+                sfx.dd();
+                let el = document.getElementById(`seat_dd_${seatIdx}`);
+                if(el) {
+                    el.innerHTML = "✖️2 DOUBLE!";
+                    el.style.animation = 'none';
+                    el.offsetHeight; 
+                    el.style.animation = "dd-pop 1.5s forwards";
+                }
+            }catch(e){}
+        });
+
+        socket.on('player_bust', (seatIdx) => {
+            try {
+                sfx.bust();
+            }catch(e){}
+        });
+
+        socket.on('hand_settled_animation', (data) => {
+            try {
+                let dealerEl = document.getElementById('dealerSeat');
+                if(!dealerEl) return;
+                let dRect = dealerEl.getBoundingClientRect();
+                
+                data.results.forEach(res => {
+                    let seatEl = document.getElementById(`seat_${res.seatIndex}`);
+                    if (!seatEl) return;
+                    let sRect = seatEl.getBoundingClientRect();
+                    
+                    let floatText = document.createElement('div');
+                    floatText.className = 'float-text';
+                    floatText.style.left = `${sRect.left + sRect.width/2 - 20}px`;
+                    floatText.style.top = `${sRect.top}px`;
+                    
+                    if(res.result === 'push') {
+                        floatText.innerText = `+0`;
+                        floatText.style.color = '#cbd5e1';
+                    } else if(res.result === 'won') {
+                        floatText.innerText = `+${res.amount}`;
+                        floatText.style.color = 'var(--win-green)';
+                        sfx.win();
+                    } else {
+                        floatText.innerText = `${res.amount}`; 
+                        floatText.style.color = 'var(--lose-red)';
+                        sfx.lose();
+                    }
+                    document.body.appendChild(floatText);
+                    setTimeout(()=> floatText.remove(), 1500);
+
+                    if (res.result !== 'push') {
+                        let chip = document.createElement('div');
+                        chip.className = 'flying-chip';
+                        document.body.appendChild(chip);
+
+                        if (res.result === 'won') {
+                            chip.style.left = `${dRect.left + dRect.width/2}px`;
+                            chip.style.top = `${dRect.top + dRect.height/2}px`;
+                            setTimeout(() => {
+                                chip.style.left = `${sRect.left + sRect.width/2}px`;
+                                chip.style.top = `${sRect.top + sRect.height/2}px`;
+                            }, 50);
+                        } else {
+                            chip.style.left = `${sRect.left + sRect.width/2}px`;
+                            chip.style.top = `${sRect.top + sRect.height/2}px`;
+                            setTimeout(() => {
+                                chip.style.left = `${dRect.left + dRect.width/2}px`;
+                                chip.style.top = `${dRect.top + dRect.height/2}px`;
+                            }, 50);
+                        }
+                        setTimeout(() => chip.remove(), 750);
+                    }
+                });
+
+                setTimeout(() => {
+                    let myTotal = data.playerHandTotalPnL[socket.id];
+                    if (myTotal !== undefined) {
+                        try {
+                            let popup = document.getElementById('totalPnlPopup');
+                            let amtEl = document.getElementById('totalPnlAmount');
+                            if (myTotal === 0) {
+                                amtEl.innerText = "+0";
+                                amtEl.style.color = '#cbd5e1';
+                            } else {
+                                amtEl.innerText = myTotal > 0 ? `+${myTotal}` : myTotal;
+                                amtEl.style.color = myTotal > 0 ? 'var(--win-green)' : 'var(--lose-red)';
+                            }
+                            popup.style.display = 'block';
+                            setTimeout(() => { popup.style.display = 'none'; }, 2500);
+                        } catch(e){}
+                    }
+                }, 1000);
+            } catch(e){}
+        });
+
+        function renderSeats() {
+            try {
+                if(!globalState) return;
+                let seatsHtml = '';
+                for(let i=0; i<5; i++) {
+                    let seat = globalState.seats[i];
+                    seatsHtml += `<div class="seat-wrapper">`;
+                    if (!seat) {
+                        if (!amIDealer && (globalState.status === 'waiting' || globalState.status === 'settled' || globalState.status === 'playing' || globalState.status === 'betting')) {
+                            seatsHtml += `<div class="seat empty-seat" onclick="handleSeatClick(${i})">🪑 入座</div>`;
+                        } else {
+                            seatsHtml += `<div class="seat" style="opacity:0.3; border: 2px dashed #aaa; display:flex; justify-content:center; align-items:center; background:rgba(0,0,0,0.5);"><span style="color:#aaa; font-weight:bold;">空位 ${i+1}</span></div>`;
+                        }
+                    } else {
+                        let pOwner = globalState.players[seat.ownerId] || (globalState.offlinePlayers && globalState.offlinePlayers.find(p => p.oldId === seat.ownerId));
+                        
+                        let isTurn = (globalState.status === 'playing' && globalState.currentSeatIndex === i);
+                        let isMainSelected = (selectedBetTarget && selectedBetTarget.type === 'main' && selectedBetTarget.index === i);
+                        let activeClass = isTurn ? 'active-turn' : (isMainSelected ? 'selected-for-bet' : '');
+                        
+                        let cardsHtml = (seat.cards || []).map(generateCardHtml).join('');
+                        let scoreBadge = seat.score > 0 ? `<div class="seat-score seat-score-absolute">${seat.scoreDisplay}</div>` : '';
+
+                        let nameDisplay = pOwner ? pOwner.name : "未知玩家";
+                        if(seat.ownerId === socket.id) nameDisplay = `<span style="color:var(--gold);">我</span>`;
+                        else if (globalState.players && !globalState.players[seat.ownerId]) nameDisplay = `<span style="color:#666;">${nameDisplay} (💤)</span>`;
+                        
+                        let waitingMsg = (seat.state === 'waiting_next' && globalState.status === 'playing') ? `<div style="position:absolute; top:40%; color:rgba(255,255,255,0.5); font-weight:bold; width:100%; text-align:center;">⏳ 等待下局</div>` : '';
+                        
+                        let bustClass = '';
+                        if (seat.state === 'bust') {
+                            bustClass = 'seat-bust-static';
+                            if (!knownBusts.has(i)) {
+                                bustClass += ' seat-bust-anim';
+                                knownBusts.add(i);
+                            }
+                        }
+
+                        let doubleClass = seat.isDoubleDown ? 'seat-double-down' : '';
+
+                        let isBehindSelected = (selectedBetTarget && selectedBetTarget.type === 'behind' && selectedBetTarget.index === i);
+                        let behindActiveClass = isBehindSelected ? 'selected-for-bet' : '';
+                        
+                        let behindDisplayAmount = 0;
+                        let behindStr = "買馬區";
+                        if(seat.betBehind && seat.betBehind[socket.id]) {
+                            behindDisplayAmount = seat.betBehind[socket.id].amount || 0;
+                            behindStr = "我的買馬";
+                            if(seat.betBehind[socket.id].isConfirmed) behindStr = "✅ 已確認";
+                        }
+
+                        let betBehindHtml = '';
+                        if (!amIDealer && seat.ownerId !== socket.id && globalState.status === 'betting') {
+                            if (seat.bet > 0) {
+                                betBehindHtml = `<div class="bet-behind-zone ${behindActiveClass}" onclick="selectBetBehind(${i}, event)">${behindStr}<br><span style="color:white; font-size:1.2em;">$${behindDisplayAmount}</span></div>`;
+                            } else {
+                                betBehindHtml = `<div class="bet-behind-zone" style="opacity:0.4; cursor:not-allowed;" onclick="event.stopPropagation(); alert('請等待主位玩家先下注，才能買馬！')">等待主位下注</div>`;
+                            }
+                        }
+
+                        let othersBehindHtml = '';
+                        let specList = [];
+                        if(seat.betBehind) {
+                            for(let specId in seat.betBehind) {
+                                let amt = seat.betBehind[specId].amount || 0;
+                                if(amt > 0) {
+                                    let specP = globalState.players[specId] || (globalState.offlinePlayers && globalState.offlinePlayers.find(p => p.oldId === specId));
+                                    let specName = specP ? specP.name : "玩家";
+                                    let isMe = (specId === socket.id) ? '(我)' : '';
+                                    specList.push(`<div style="background:rgba(0,0,0,0.6); padding:3px 8px; border-radius:6px; font-size:0.85em; color:#cbd5e1; margin-top:2px; white-space:nowrap; border:1px solid #444;">👤 ${specName}${isMe}: $${amt}</div>`);
+                                }
+                            }
+                        }
+                        if(specList.length > 0) {
+                            othersBehindHtml = `<div class="others-behind-list">${specList.join('')}</div>`;
+                        }
+
+                        seatsHtml += `
+                            <div class="seat ${activeClass} ${bustClass} ${doubleClass}" id="seat_${i}" onclick="handleSeatClick(${i})">
+                            ${scoreBadge}
+                            <div class="bj-anim" id="seat_bj_${i}"></div>
+                            <div class="dd-anim" id="seat_dd_${i}"></div>
+                            <div class="bust-stamp">BUST</div>
+                            ${othersBehindHtml}
+                            <div class="card-container" style="min-height:75px;">${cardsHtml}</div>
+                            ${waitingMsg}
+                            <div class="seat-name">${nameDisplay}</div>
+                            <div class="seat-bet">Bet: $${seat.bet || 0}</div>
+                            ${betBehindHtml}
+                        </div>`;
+                    }
+                    seatsHtml += `</div>`;
+                }
+                document.getElementById('seatsArea').innerHTML = seatsHtml;
+            } catch(e) { console.error("renderSeats Error:", e); }
+        }
+
+        socket.on('update_state', (state) => {
+            try {
+                globalState = state;
+                let me = state.players[socket.id];
+                if(!me) return;
+                
+                amIDealer = (state.dealerId === socket.id);
+                amIHost = (state.hostId === socket.id);
+                currentStatus = state.status;
+
+                if (state.status === 'betting') knownBusts.clear();
+
+                if(document.getElementById('deckCountDisplay')) document.getElementById('deckCountDisplay').innerText = state.deck.length;
+                if(document.getElementById('myBalanceDisplay')) document.getElementById('myBalanceDisplay').innerText = me.balance;
+
+                if (amIDealer && state.chipRequests && state.chipRequests.length > 0) {
+                    document.getElementById('chipRequestsPanel').style.display = 'block';
+                    let reqHtml = '';
+                    state.chipRequests.forEach(r => {
+                        reqHtml += `<div class="req-item">
+                            <span>${r.name} 申請 $${r.amount}</span>
+                            <div>
+                                <button style="width:auto; padding:5px 10px; background:var(--win-green); color:#000;" onclick="handleReq('${r.id}', ${r.amount}, true)">✓</button>
+                                <button style="width:auto; padding:5px 10px; background:var(--lose-red); color:#fff;" onclick="handleReq('${r.id}', ${r.amount}, false)">✗</button>
+                            </div>
+                        </div>`;
+                    });
+                    document.getElementById('reqList').innerHTML = reqHtml;
+                } else {
+                    if(document.getElementById('chipRequestsPanel')) document.getElementById('chipRequestsPanel').style.display = 'none';
+                }
+
+                if (state.status !== 'betting' && state.status !== 'playing' && state.status !== 'insurance') {
+                    if(document.getElementById('timerDisplay')) document.getElementById('timerDisplay').innerText = '';
+                    selectedBetTarget = null; 
+                }
+
+                let pnlHtml = '';
+                for(let id in state.players) {
+                    let p = state.players[id];
+                    let role = id === state.dealerId ? '👑' : '👤';
+                    let pColor = p.pnl >= 0 ? 'text-win' : 'text-lose';
+                    pnlHtml += `<div class="pnl-item"><span>${role} ${p.name}</span><span class="${pColor}">${p.pnl>0?'+':''}${p.pnl}</span></div>`;
+                }
+                if(state.offlinePlayers) {
+                    state.offlinePlayers.forEach(p => {
+                        let role = p.oldId === state.dealerId ? '👑' : '👤';
+                        let pColor = p.pnl >= 0 ? 'text-win' : 'text-lose';
+                        pnlHtml += `<div class="pnl-item" style="color:#666; font-style:italic;"><span>${role} ${p.name} (💤)</span><span class="${pColor}">${p.pnl>0?'+':''}${p.pnl}</span></div>`;
+                    });
+                }
+                if(document.getElementById('playerList')) document.getElementById('playerList').innerHTML = pnlHtml;
+
+                if(document.getElementById('masterPanel')) document.getElementById('masterPanel').style.display = 'flex';
+                if(state.status !== 'betting' && state.status !== 'insurance') {
+                    if(document.getElementById('resultMsg')) document.getElementById('resultMsg').innerText = state.message;
+                }
+                if(document.getElementById('resultMsg')) document.getElementById('resultMsg').style.color = state.messageColor || "var(--gold)";
+
+                let dealer = state.players[state.dealerId] || (state.offlinePlayers && state.offlinePlayers.find(p => p.oldId === state.dealerId));
+                if(dealer) {
+                    if(document.getElementById('dealerName')) document.getElementById('dealerName').innerText = `(${dealer.name})`;
+                    if(document.getElementById('dealerCardsArea')) document.getElementById('dealerCardsArea').innerHTML = (state.dealerCards||[]).map(generateCardHtml).join('');
+                    if(document.getElementById('dealerScore')) {
+                        document.getElementById('dealerScore').innerText = state.dealerScoreDisplay || '';
+                        document.getElementById('dealerScore').style.display = state.dealerScore > 0 ? 'flex' : 'none';
+                    }
+                }
+
+                renderSeats();
+
+                if (state.status === 'session_ended' && amIHost) {
+                    let modalList = '';
+                    let allCandidates = [...Object.values(state.players), ...(state.offlinePlayers||[])];
+                    allCandidates.forEach(p => {
+                        let pid = p.oldId || Object.keys(state.players).find(key => state.players[key] === p);
+                        let roleStr = pid === state.dealerId ? " (原莊家)" : "";
+                        let sleepStr = p.oldId ? " (💤離線)" : "";
+                        let pColor = p.pnl >= 0 ? 'var(--win-green)' : 'var(--lose-red)';
+                        let sign = p.pnl > 0 ? '+' : '';
+                        
+                        modalList += `
+                        <div class="modal-item" id="modal_item_${pid}" onclick="selectNextDealer('${pid}')">
+                            <div style="font-size:1.2em; font-weight:bold; color:var(--gold);">${p.name}${roleStr}${sleepStr}</div>
+                            <div style="display:flex; justify-content:space-between; margin-top:5px; font-size:0.9em; color:#fff;">
+                                <span>總盈虧: <span style="color:${pColor}">${sign}${p.pnl}</span></span>
+                                <span>餘額: $${p.balance}</span>
+                            </div>
+                        </div>`;
+                    });
+                    if(document.getElementById('dealerCandidateList')) document.getElementById('dealerCandidateList').innerHTML = modalList;
+                    if(document.getElementById('settleModal')) document.getElementById('settleModal').style.display = 'flex';
+                } else {
+                    if(document.getElementById('settleModal')) document.getElementById('settleModal').style.display = 'none';
+                }
+
+                // 🚀 修復：顯示總結算按鈕 🚀
+                if(document.getElementById('adminControls')) {
+                    document.getElementById('adminControls').style.display = (amIDealer && (state.status === 'waiting' || state.status === 'settled')) ? 'flex' : 'none';
+                }
+                if(document.getElementById('btnEndSession')) {
+                    document.getElementById('btnEndSession').style.display = (amIHost && (state.status === 'waiting' || state.status === 'settled')) ? 'block' : 'none';
+                }
+
+                if(document.getElementById('hostControls')) document.getElementById('hostControls').style.display = 'none';
+                if(document.getElementById('bettingControls')) document.getElementById('bettingControls').style.display = 'none';
+                if(document.getElementById('playingControls')) document.getElementById('playingControls').style.display = 'none';
+                if(document.getElementById('insuranceControls')) document.getElementById('insuranceControls').style.display = 'none';
+
+                if (state.status === 'waiting' || state.status === 'settled') {
+                    if (amIDealer) {
+                        document.getElementById('hostControls').style.display = 'flex';
+                    }
+                }
+                else if (state.status === 'betting') {
+                    if (!amIDealer) {
+                        document.getElementById('bettingControls').style.display = 'flex';
+                        
+                        let isConfirmed = false;
+                        if(selectedBetTarget) {
+                            let tSeat = state.seats[selectedBetTarget.index];
+                            if(selectedBetTarget.type === 'main' && tSeat) isConfirmed = tSeat.isBetConfirmed;
+                            else if(selectedBetTarget.type === 'behind' && tSeat && tSeat.betBehind[socket.id]) isConfirmed = tSeat.betBehind[socket.id].isConfirmed;
+                        }
+
+                        if (isConfirmed) {
+                            document.getElementById('chipsActionArea').style.display = 'none';
+                            document.getElementById('seatIndicator').innerText = `✅ 已鎖定注碼，等待倒數結束...`;
+                        } else {
+                            document.getElementById('chipsActionArea').style.display = 'flex';
+                            if (!selectedBetTarget) {
+                                document.getElementById('seatIndicator').innerText = `請點擊發光的座位或買馬區下注`;
+                                let myFirstSeat = state.seats.findIndex(s => s && s.ownerId === socket.id && !s.isBetConfirmed);
+                                if(myFirstSeat !== -1) {
+                                    selectedBetTarget = { type: 'main', index: myFirstSeat };
+                                    document.getElementById('seatIndicator').innerText = `👉 正在為 座位 ${myFirstSeat + 1} 佈局`;
+                                    renderSeats();
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (state.status === 'insurance') {
+                    let canBuy = false;
+                    state.seats.forEach(s => {
+                        if(s && s.ownerId === socket.id && s.bet > 0 && s.insurance === 0) canBuy = true;
+                        if(s && s.betBehind && s.betBehind[socket.id] && s.betBehind[socket.id].amount > 0 && s.betBehind[socket.id].insurance === 0) canBuy = true;
+                    });
+                    if(canBuy) document.getElementById('insuranceControls').style.display = 'flex';
+                    else document.getElementById('resultMsg').innerText = "等待其他玩家決定保險...";
+                }
+                else if (state.status === 'playing') {
+                    let currSeat = state.seats[state.currentSeatIndex];
+                    if (currSeat && currSeat.ownerId === socket.id) {
+                        document.getElementById('playingControls').style.display = 'flex';
+                        document.getElementById('btnDoubleDown').style.display = (currSeat.cards.length === 2) ? 'block' : 'none';
+                    }
+                }
+            } catch(e) { console.error("Update State Error", e); }
+        });
+    </script>
+</body>
+</html>
