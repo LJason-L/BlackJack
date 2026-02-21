@@ -122,13 +122,13 @@
         .empty-seat { justify-content: center; color: rgba(255,255,255,0.5); font-weight:bold; border-style: dashed;}
         .empty-seat:hover { background: rgba(255,215,0,0.1); border-color: var(--gold);}
 
-        /* 牌張容器 */
-        .card-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; width: 100%; padding-left: 40px;} 
+        /* 🚀 牌張完美置中演算法 (徹底移除 padding-left，改用 margin-right) 🚀 */
+        .card-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; width: 100%; padding: 0; } 
         .card { 
             width: 65px; height: 95px; border-radius: 6px; box-shadow: -2px 2px 8px rgba(0,0,0,0.5); 
-            background: white; color: black; margin-left: -40px; position: relative;
+            background: white; color: black; margin-right: -35px; position: relative;
         }
-        .card:first-child { margin-left: 0; } 
+        .card:last-child { margin-right: 0; } /* 最後一張牌不偏移 */
         
         .card-hidden { background: repeating-linear-gradient(45deg, #1e3a8a, #1e3a8a 10px, #1e40af 10px, #1e40af 20px); border: 3px solid white;}
         .card-hidden .card-content { display: none; }
@@ -197,12 +197,11 @@
         .modal-item.selected { background: rgba(255,215,0,0.2); border-color: var(--gold); box-shadow: 0 0 15px rgba(255,215,0,0.5);}
         .modal-item.selected::after { content: '✅'; position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 1.5em; }
 
-        /* 📱 手機版 RWD (史詩級醫美修正) 📱 */
+        /* 📱 手機版 RWD (精準完美置中) 📱 */
         @media (max-width: 768px) {
             body { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
             
-            /* 頂部導航列 */
-            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--gold); padding: 10px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.95); z-index: 200; box-shadow: 0 4px 10px rgba(0,0,0,0.8);}
+            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--gold); padding: 10px; display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.95); z-index: 200; box-shadow: 0 4px 10px rgba(0,0,0,0.8);}
             .room-tag { margin-bottom: 0; padding: 5px 10px; font-size: 0.8em; flex: 0.4; }
             .balance-box { margin-bottom: 0; padding: 5px; flex: 0.55; display: flex; flex-direction: column; align-items: center; justify-content: center;}
             .balance-title { font-size: 0.6em; }
@@ -214,8 +213,7 @@
             .admin-controls button { font-size: 0.8em; padding: 6px; margin: 0; flex: 1;}
 
             .req-panel { left: 5px; top: 120px; right: 5px; padding: 10px; }
-
-            /* 牌桌重構 */
+            
             .casino-table { padding: 10px 5px 220px 5px; border-radius: 0 0 30px 30px; } 
             .table-text { top: 35%; width: 100%; }
             .table-text h2 { font-size: 2.2em; letter-spacing: 2px; }
@@ -228,11 +226,9 @@
             .shoe { width: 45px; height: 60px; top: 10px; right: 10px; border-radius: 6px; }
             .shoe .deck-count { font-size: 1em; margin-bottom: 2px; }
             .shoe .shoe-label { font-size: 0.5em; }
-
-            /* 🚀 核心：座位區黃金比例 🚀 */
-            .seats-container { margin-bottom: 70px; padding: 0 2px;} /* 增加底部 Margin 閃開 Dock */
+            
+            .seats-container { margin-bottom: 70px; padding: 0 2px;}
             .seat-wrapper { flex: 1; display:flex; flex-direction:column; align-items:center; }
-            /* 壓平曲線，節省高度 */
             .seat-wrapper:nth-child(1) { transform: translateY(-25px) rotate(8deg); }
             .seat-wrapper:nth-child(2) { transform: translateY(-10px) rotate(4deg); }
             .seat-wrapper:nth-child(3) { transform: translateY(0px) rotate(0deg); }
@@ -241,9 +237,11 @@
             
             .seat { width: 100%; max-width: 65px; height: 90px; border-width: 2px; border-radius: 8px; }
             
-            /* 🚀 牌張縮小且完美置中 🚀 */
-            .card-container { padding-left: 20px; margin-top: 10px;}
-            .card { width: 38px; height: 55px; border-radius: 4px; margin-left: -20px; border-width: 1px;}
+            /* 🚀 手機版牌張 徹底置中修正 🚀 */
+            .card-container { padding: 0; margin-top: 10px; }
+            .card { width: 38px; height: 55px; border-radius: 4px; border-width: 1px; margin-right: -20px; }
+            .card:last-child { margin-right: 0; }
+            
             .card-corner { top: 1px; left: 2px; }
             .card-corner-val { font-size: 11px; }
             .card-corner-suit { font-size: 9px; }
@@ -252,16 +250,13 @@
             .seat-name { font-size: 0.65em; bottom: -18px; width: 120%; padding: 2px; border-radius: 4px; white-space: nowrap;}
             .seat-bet { font-size: 0.75em; bottom: -35px; padding: 2px 6px; border-radius: 6px; }
             
-            /* 買馬區與其他人買馬名單 */
             .bet-behind-zone { bottom: -70px; width: 120%; height: 25px; font-size: 0.6em; border-radius: 4px; border-width: 1px; }
             .others-behind-list { bottom: -95px; width: 140%; }
             .others-behind-list div { font-size: 0.55em; padding: 1px 4px; margin-top: 1px; }
 
-            /* 特效縮小 */
             .bj-anim, .dd-anim { font-size: 1.2em; text-shadow: 0 0 10px #000; }
             .bust-stamp { font-size: 1.2em; padding: 2px 8px; border-width: 2px; border-radius: 6px;}
 
-            /* 懸浮列 (Dock) 優化 */
             .bottom-dock { width: 96%; bottom: 10px; border-radius: 20px; padding: 10px; min-width: unset;}
             #resultMsg { font-size: 0.9em; margin-bottom: 5px; white-space: normal; text-align: center; line-height: 1.2;}
             .chips-area { gap: 5px; margin-bottom: 8px; }
@@ -272,7 +267,6 @@
             #chipsActionArea .action-row button { font-size: 0.8em; padding: 8px; }
             .action-timer { font-size: 0.8em; padding: 3px 10px; margin-bottom: 5px; }
 
-            /* 彈窗置中 */
             .total-pnl-popup { padding: 15px 30px; top: 35%; width: 80%;}
             #totalPnlAmount { font-size: 2.5em; }
             .glass-panel { width: 95%; padding: 20px; }
@@ -323,7 +317,7 @@
             <div class="pnl-list" id="playerList"></div>
         </div>
         <div class="admin-controls" id="adminControls" style="display:none;">
-            <button class="btn-red" id="btnEndSession" onclick="if(confirm('確定要結束這場牌局並進行總結算嗎？')) socket.emit('end_session')" style="display:none; width:100%; margin-bottom:10px;">🛑 終局總結算</button>
+            <button class="btn-red" id="btnEndSession" onclick="if(confirm('確定要結束這場牌局並進行總結算嗎？')) socket.emit('end_session')" style="width:100%;">🛑 終局總結算</button>
             <button style="background:transparent; border:1px solid #FF3366; color:#FF3366; width:100%;" onclick="if(confirm('確定強制重置牌桌？所有人的下注將被清空。')) socket.emit('force_reset')">🔄 強制重置</button>
         </div>
     </div>
@@ -646,7 +640,7 @@
                     floatText.style.top = `${sRect.top}px`;
                     
                     if(res.result === 'push') {
-                        floatText.innerText = `+0 (平手)`;
+                        floatText.innerText = `+0`;
                         floatText.style.color = '#cbd5e1';
                     } else if(res.result === 'won') {
                         floatText.innerText = `+${res.amount}`;
@@ -691,7 +685,7 @@
                             let popup = document.getElementById('totalPnlPopup');
                             let amtEl = document.getElementById('totalPnlAmount');
                             if (myTotal === 0) {
-                                amtEl.innerText = "+0 (平手)";
+                                amtEl.innerText = "+0";
                                 amtEl.style.color = '#cbd5e1';
                             } else {
                                 amtEl.innerText = myTotal > 0 ? `+${myTotal}` : myTotal;
@@ -898,8 +892,12 @@
                     if(document.getElementById('settleModal')) document.getElementById('settleModal').style.display = 'none';
                 }
 
+                // 🚀 修復：顯示總結算按鈕 🚀
                 if(document.getElementById('adminControls')) {
                     document.getElementById('adminControls').style.display = (amIDealer && (state.status === 'waiting' || state.status === 'settled')) ? 'flex' : 'none';
+                }
+                if(document.getElementById('btnEndSession')) {
+                    document.getElementById('btnEndSession').style.display = (amIHost && (state.status === 'waiting' || state.status === 'settled')) ? 'block' : 'none';
                 }
 
                 if(document.getElementById('hostControls')) document.getElementById('hostControls').style.display = 'none';
@@ -930,6 +928,12 @@
                             document.getElementById('chipsActionArea').style.display = 'flex';
                             if (!selectedBetTarget) {
                                 document.getElementById('seatIndicator').innerText = `請點擊發光的座位或買馬區下注`;
+                                let myFirstSeat = state.seats.findIndex(s => s && s.ownerId === socket.id && !s.isBetConfirmed);
+                                if(myFirstSeat !== -1) {
+                                    selectedBetTarget = { type: 'main', index: myFirstSeat };
+                                    document.getElementById('seatIndicator').innerText = `👉 正在為 座位 ${myFirstSeat + 1} 佈局`;
+                                    renderSeats();
+                                }
                             }
                         }
                     }
