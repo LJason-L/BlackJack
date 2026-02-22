@@ -19,6 +19,12 @@ function generateRoomId() {
     return result;
 }
 
+// 🛡️ 終極防卡死：全局時間鎖清理 🛡️
+function clearAllTimers(roomId) {
+    if(roomTimers[roomId]) { clearInterval(roomTimers[roomId]); delete roomTimers[roomId]; }
+    if(roomTimers[roomId + '_timeout']) { clearTimeout(roomTimers[roomId + '_timeout']); delete roomTimers[roomId + '_timeout']; }
+}
+
 function calculateScore(cards) {
     if(!cards) return 0;
     let score = 0, aces = 0;
@@ -105,9 +111,16 @@ function sendSanitizedState(roomId) {
                 s.seats.forEach(seat => {
                     if (seat && seat.cards) {
                         seat.score = calculateScore(seat.cards); 
-                        seat.scoreDisplay = calculateScoreString(seat.cards.filter(c => !c.hidden));
+                        // 🚀 點數坍縮邏輯：停牌、爆牌、結算或拿到21點時，強制顯示最終數字 🚀
+                        let visibleCards = seat.cards.filter(c => !c.hidden);
+                        if (s.status === 'settled' || seat.state === 'stood' || seat.state === 'bust' || seat.score === 21) {
+                            seat.scoreDisplay = calculateScore(visibleCards).toString();
+                        } else {
+                            seat.scoreDisplay = calculateScoreString(visibleCards);
+                        }
                     }
                 });
+
                 if (s.status !== 'dealer_turn' && s.status !== 'settled') {
                     if(s.dealerCards) {
                         s.dealerCards = s.dealerCards.map(c => {
@@ -123,7 +136,12 @@ function sendSanitizedState(roomId) {
                     }
                 } else {
                     s.dealerScore = calculateScore(s.dealerCards);
-                    s.dealerScoreDisplay = calculateScoreString(s.dealerCards);
+                    // 莊家點數坍縮
+                    if (s.status === 'settled' || s.dealerState === 'stood' || s.dealerState === 'bust' || s.dealerScore === 21) {
+                        s.dealerScoreDisplay = s.dealerScore.toString();
+                    } else {
+                        s.dealerScoreDisplay = calculateScoreString(s.dealerCards);
+                    }
                 }
                 socket.emit('update_state', s);
             } catch(e) {}
@@ -139,7 +157,8 @@ function clearNewFlags(roomId) {
 }
 
 function autoClearAnimation(roomId, delay) {
-    setTimeout(() => {
+    clearAllTimers(roomId + "_anim"); 
+    roomTimers[roomId + "_anim"] = setTimeout(() => {
         try {
             if(!rooms[roomId]) return;
             clearNewFlags(roomId);
@@ -151,12 +170,14 @@ function autoClearAnimation(roomId, delay) {
 function startBetting(roomId) {
     let state = rooms[roomId];
     if(!state) return;
+    clearAllTimers(roomId);
+    
     if (state.deck.length < 50) {
         state.message = "🃏 牌庫即將見底，更換 8 副新牌中...";
         state.messageColor = "#F5D061";
         io.to(roomId).emit('shuffling_deck');
         initDeck(roomId);
-        setTimeout(() => executeStartBetting(roomId), 3000);
+        roomTimers[roomId + '_timeout'] = setTimeout(() => executeStartBetting(roomId), 3000);
     } else {
         executeStartBetting(roomId);
     }
@@ -165,6 +186,8 @@ function startBetting(roomId) {
 function executeStartBetting(roomId) {
     let state = rooms[roomId];
     if(!state) return;
+    clearAllTimers(roomId);
+    
     state.status = 'betting';
     state.timer = 10;
     state.timerType = 'betting';
@@ -198,24 +221,24 @@ function executeStartBetting(roomId) {
     state.message = "⏳ 倒數 10 秒！請點擊發光的座位或買馬區下注...";
     sendSanitizedState(roomId);
 
-    if(roomTimers[roomId]) clearInterval(roomTimers[roomId]);
     roomTimers[roomId] = setInterval(() => {
         try {
             let st = rooms[roomId];
-            if(!st) { clearInterval(roomTimers[roomId]); return; }
+            if(!st) { clearAllTimers(roomId); return; }
             st.timer--;
             io.to(roomId).emit('timer_tick', { time: st.timer, type: 'betting' });
             if (st.timer <= 0) {
-                clearInterval(roomTimers[roomId]);
+                clearAllTimers(roomId);
                 dealInitialCards(roomId);
             }
-        } catch(e){ clearInterval(roomTimers[roomId]); }
+        } catch(e){ clearAllTimers(roomId); }
     }, 1000);
 }
 
 function dealInitialCards(roomId) {
     let state = rooms[roomId];
     if(!state) return;
+    clearAllTimers(roomId);
     state.status = 'dealing';
     
     let activeSeats = [];
@@ -246,7 +269,7 @@ function dealInitialCards(roomId) {
 
     let delay = 0;
     queue.forEach((task) => {
-        setTimeout(() => {
+        roomTimers[roomId + '_timeout_' + delay] = setTimeout(() => {
             try {
                 let st = rooms[roomId];
                 if(!st) return;
@@ -263,7 +286,7 @@ function dealInitialCards(roomId) {
         delay += 600; 
     });
 
-    setTimeout(() => {
+    roomTimers[roomId + '_timeout'] = setTimeout(() => {
         try {
             let st = rooms[roomId];
             if(!st) return;
@@ -274,7 +297,7 @@ function dealInitialCards(roomId) {
                 if(seat) {
                     seat.score = calculateScore(seat.cards);
                     if (seat.score === 21) {
-                        seat.state = 'blackjack';
+                        seat.state = 'blackjack'; // 狀態更新後會觸發分數坍縮
                         io.to(roomId).emit('player_blackjack', idx); 
                     }
                 }
@@ -295,42 +318,45 @@ function dealInitialCards(roomId) {
 function triggerInsurance(roomId) {
     let state = rooms[roomId];
     if(!state) return;
+    clearAllTimers(roomId);
+    
     state.status = 'insurance';
     state.timer = 10;
     state.timerType = 'action';
     state.message = "🛡️ 莊家明牌為 A！是否購買保險 (10秒)？";
     sendSanitizedState(roomId);
 
-    if(roomTimers[roomId]) clearInterval(roomTimers[roomId]);
     roomTimers[roomId] = setInterval(() => {
         try {
             let st = rooms[roomId];
-            if(!st) { clearInterval(roomTimers[roomId]); return; }
+            if(!st) { clearAllTimers(roomId); return; }
             st.timer--;
             io.to(roomId).emit('timer_tick', { time: st.timer, type: 'action' });
             if (st.timer <= 0) {
-                clearInterval(roomTimers[roomId]);
+                clearAllTimers(roomId);
                 resolveInsurance(roomId);
             }
-        }catch(e){ clearInterval(roomTimers[roomId]); }
+        }catch(e){ clearAllTimers(roomId); }
     }, 1000);
 }
 
 function resolveInsurance(roomId) {
     let state = rooms[roomId];
     if(!state || !state.dealerCards[1]) return;
+    clearAllTimers(roomId);
+
     let dealerHiddenCard = state.dealerCards[1];
-    let isDealerBJ = (dealerHiddenCard.value === 1 || dealerHiddenCard.value >= 10); 
+    let isDealerBJ = (dealerHiddenCard.value >= 10); 
 
     if (isDealerBJ) {
         state.message = "💥 莊家是 BLACKJACK！保險理賠 2 倍！";
         state.dealerCards[1].faceDown = false; 
         sendSanitizedState(roomId);
-        setTimeout(() => settleGame(roomId), 2500);
+        roomTimers[roomId + '_timeout'] = setTimeout(() => settleGame(roomId), 2500);
     } else {
         state.message = "❌ 莊家不是 BLACKJACK，保險金沒收！遊戲繼續。";
         sendSanitizedState(roomId);
-        setTimeout(() => {
+        roomTimers[roomId + '_timeout'] = setTimeout(() => {
             if(!rooms[roomId]) return;
             rooms[roomId].status = 'playing';
             rooms[roomId].currentSeatIndex = 5;
@@ -342,7 +368,7 @@ function resolveInsurance(roomId) {
 function nextPlayerTurn(roomId) {
     let state = rooms[roomId];
     if(!state) return;
-    if(roomTimers[roomId]) clearInterval(roomTimers[roomId]);
+    clearAllTimers(roomId); // 🛡️ 進入下一回合前，絕對清空所有計時器，防止重疊 🛡️
 
     state.currentSeatIndex--;
     while (state.currentSeatIndex >= 0) {
@@ -359,15 +385,15 @@ function nextPlayerTurn(roomId) {
             roomTimers[roomId] = setInterval(() => {
                 try {
                     let st = rooms[roomId];
-                    if(!st) { clearInterval(roomTimers[roomId]); return; }
+                    if(!st) { clearAllTimers(roomId); return; }
                     st.timer--;
                     io.to(roomId).emit('timer_tick', { time: st.timer, type: 'action' });
                     if (st.timer <= 0) {
-                        clearInterval(roomTimers[roomId]);
+                        clearAllTimers(roomId);
                         if(st.seats[st.currentSeatIndex]) st.seats[st.currentSeatIndex].state = 'stood'; 
                         nextPlayerTurn(roomId);
                     }
-                }catch(e){ clearInterval(roomTimers[roomId]); }
+                }catch(e){ clearAllTimers(roomId); }
             }, 1000);
             return;
         }
@@ -379,6 +405,8 @@ function nextPlayerTurn(roomId) {
 function dealerTurn(roomId) {
     let state = rooms[roomId];
     if(!state) return;
+    clearAllTimers(roomId);
+    
     state.status = 'dealer_turn';
 
     if(state.dealerCards.length >= 2) {
@@ -396,7 +424,7 @@ function dealerTurn(roomId) {
         if (seat && seat.state === 'stood') needsToDraw = true; 
     });
 
-    setTimeout(() => {
+    roomTimers[roomId + '_timeout'] = setTimeout(() => {
         try {
             let st = rooms[roomId];
             if(!st) return;
@@ -405,7 +433,7 @@ function dealerTurn(roomId) {
                 else st.dealerState = 'stood';
                 st.message = `🛑 莊家 ${st.dealerScore} 點。進入結算！`;
                 sendSanitizedState(roomId);
-                setTimeout(() => settleGame(roomId), 1500);
+                roomTimers[roomId + '_timeout'] = setTimeout(() => settleGame(roomId), 1500);
                 return;
             }
 
@@ -434,23 +462,23 @@ function dealerTurn(roomId) {
                             s.messageColor = "#00E676";
                         }
                         sendSanitizedState(roomId);
-                        setTimeout(() => settleGame(roomId), 2000);
+                        roomTimers[roomId + '_timeout'] = setTimeout(() => settleGame(roomId), 2000);
                     }
                 }catch(e){ clearInterval(drawInterval); }
             }, 1200); 
+            roomTimers[roomId] = drawInterval; // 加入清理清單
         }catch(e){}
     }, 1500);
 }
 
-// 🛡️ 史詩級修復：無敵鐵血判定系統 🛡️
 function settleGame(roomId) {
     let state = rooms[roomId];
     if(!state) return;
+    clearAllTimers(roomId);
     state.status = 'settled';
     
-    // 重新計算確保點數絕對精準
     state.dealerScore = calculateScore(state.dealerCards);
-    let dScore = state.dealerScore > 21 ? 0 : state.dealerScore; // 莊家爆牌算 0 點
+    let dScore = state.dealerScore > 21 ? 0 : state.dealerScore;
     let dIsBJ = (state.dealerCards.length === 2 && state.dealerScore === 21);
 
     let handResults = []; 
@@ -466,24 +494,14 @@ function settleGame(roomId) {
         let pIsBJ = (seat.cards.length === 2 && pScore === 21);
         let multiplier = 0; 
 
-        // 🎲 嚴格實體賭場判定規則 🎲
         if (pScore > 21) { 
-            // 規則1: 玩家爆牌，不管莊家幾點，玩家一定輸 (直接扣錢)
             multiplier = -1; 
-        } else if (pIsBJ && dIsBJ) {
-            // 規則2: 雙方都是 BJ -> 平手退注
-            multiplier = 0; 
-        } else if (pIsBJ && !dIsBJ) {
-            // 規則3: 只有玩家 BJ -> 賠 1.5 倍
+        } else if (dIsBJ) {
+            if (pIsBJ) multiplier = 0; 
+            else multiplier = -1;      
+        } else if (pIsBJ) {
             multiplier = 1.5; 
-        } else if (!pIsBJ && dIsBJ) {
-            // 規則4: 只有莊家 BJ -> 玩家全輸
-            multiplier = -1; 
-        } else if (state.dealerScore > 21) {
-            // 規則5: 莊家爆牌 (且玩家沒爆) -> 玩家贏 1 倍
-            multiplier = 1;
         } else {
-            // 規則6: 都沒爆牌，沒 BJ，單純比大小
             if (pScore > dScore) multiplier = 1;
             else if (pScore < dScore) multiplier = -1;
             else multiplier = 0;
@@ -494,14 +512,12 @@ function settleGame(roomId) {
         
         let seatTotalPnL = 0;
         
-        // 結算保險
         if (seat.insurance > 0) {
             let insResult = dIsBJ ? (seat.insurance * 2) : -seat.insurance;
             if (owner) { owner.balance += (dIsBJ ? (seat.insurance + insResult) : 0); owner.pnl += insResult; playerHandTotalPnL[owner.oldId || seat.ownerId] += insResult;}
             if (dealer) { dealer.balance -= insResult; dealer.pnl -= insResult; playerHandTotalPnL[dealer.oldId || state.dealerId] -= insResult; }
         }
 
-        // 結算主位
         if (seat.bet > 0) {
             let pnlChange = seat.bet * multiplier;
             seatTotalPnL += pnlChange;
@@ -521,7 +537,6 @@ function settleGame(roomId) {
             seat.state = 'push';
         }
 
-        // 結算買馬
         for (let specId in seat.betBehind) {
             let spec = state.players[specId] || state.offlinePlayers.find(p => p.oldId === specId);
             let specBetObj = seat.betBehind[specId] || { amount: 0, insurance: 0 };
@@ -774,7 +789,7 @@ io.on('connection', (socket) => {
             let seat = state.seats[seatIndex];
             if(!seat || seat.ownerId !== socket.id) return;
             
-            if(roomTimers[roomId]) clearInterval(roomTimers[roomId]);
+            clearAllTimers(roomId); // 🛡️ 防卡死：操作瞬間清空所有殘留計時器
 
             clearNewFlags(roomId);
             let card = drawCard(roomId, false);
@@ -786,22 +801,22 @@ io.on('connection', (socket) => {
                 seat.state = 'bust';
                 io.to(roomId).emit('player_bust', seatIndex);
                 sendSanitizedState(roomId);
-                setTimeout(() => nextPlayerTurn(roomId), 1500);
+                roomTimers[roomId + '_timeout'] = setTimeout(() => nextPlayerTurn(roomId), 1500);
             } else if (seat.score === 21) {
                 seat.state = 'stood';
                 sendSanitizedState(roomId);
-                setTimeout(() => nextPlayerTurn(roomId), 1000);
+                roomTimers[roomId + '_timeout'] = setTimeout(() => nextPlayerTurn(roomId), 1000);
             } else {
                 sendSanitizedState(roomId);
                 autoClearAnimation(roomId, 800); 
                 state.timer = 10;
                 roomTimers[roomId] = setInterval(() => {
                     let st = rooms[roomId];
-                    if(!st) { clearInterval(roomTimers[roomId]); return; }
+                    if(!st) { clearAllTimers(roomId); return; }
                     st.timer--;
                     io.to(roomId).emit('timer_tick', { time: st.timer, type: 'action' });
                     if (st.timer <= 0) {
-                        clearInterval(roomTimers[roomId]);
+                        clearAllTimers(roomId);
                         if(st.seats[seatIndex]) st.seats[seatIndex].state = 'stood';
                         nextPlayerTurn(roomId);
                     }
@@ -819,7 +834,7 @@ io.on('connection', (socket) => {
             if(!seat || !player || seat.ownerId !== socket.id || seat.cards.length !== 2) return; 
 
             if (player.balance >= seat.bet) {
-                if(roomTimers[roomId]) clearInterval(roomTimers[roomId]);
+                clearAllTimers(roomId); // 🛡️ 防卡死
                 
                 player.balance -= seat.bet;
                 seat.bet *= 2; 
@@ -835,13 +850,13 @@ io.on('connection', (socket) => {
 
                 if (seat.score > 21) {
                     seat.state = 'bust';
-                    setTimeout(() => { io.to(roomId).emit('player_bust', seatIndex); }, 800);
+                    roomTimers[roomId + '_bust_timeout'] = setTimeout(() => { io.to(roomId).emit('player_bust', seatIndex); }, 800);
                 } else {
                     seat.state = 'stood'; 
                 }
                 
                 sendSanitizedState(roomId);
-                setTimeout(() => nextPlayerTurn(roomId), 2000);
+                roomTimers[roomId + '_timeout'] = setTimeout(() => nextPlayerTurn(roomId), 2000);
             } else {
                 socket.emit('error_msg', "餘額不足以雙倍下注！");
             }
@@ -853,6 +868,7 @@ io.on('connection', (socket) => {
         if (state && state.status === 'playing' && state.currentSeatIndex === seatIndex) {
             if (state.seats[seatIndex] && state.seats[seatIndex].ownerId === socket.id) {
                 state.seats[seatIndex].state = 'stood';
+                clearAllTimers(socket.roomId); // 🛡️ 防卡死
                 nextPlayerTurn(socket.roomId);
             }
         }
@@ -862,7 +878,7 @@ io.on('connection', (socket) => {
         let roomId = socket.roomId;
         let state = rooms[roomId];
         if (state && state.hostId === socket.id) {
-            if(roomTimers[roomId]) clearInterval(roomTimers[roomId]);
+            clearAllTimers(roomId);
             state.status = 'waiting';
             state.dealerCards = [];
             state.dealerScore = 0;
@@ -887,6 +903,7 @@ io.on('connection', (socket) => {
         let roomId = socket.roomId;
         let state = rooms[roomId];
         if (state && state.hostId === socket.id && (state.status === 'settled' || state.status === 'waiting')) {
+            clearAllTimers(roomId);
             state.status = 'session_ended';
             sendSanitizedState(roomId);
         }
@@ -898,6 +915,7 @@ io.on('connection', (socket) => {
         if (state && state.hostId === socket.id && state.status === 'session_ended') {
             let newDealer = state.players[newDealerId] || state.offlinePlayers.find(p => p.oldId === newDealerId);
             if (newDealer) {
+                clearAllTimers(roomId);
                 state.dealerId = newDealer.oldId || newDealerId;
                 state.seats = [null, null, null, null, null];
                 
@@ -936,7 +954,7 @@ io.on('connection', (socket) => {
             state.seats.forEach((seat, idx) => {
                 if (seat && seat.ownerId === socket.id) {
                     if (state.status === 'playing' || state.status === 'dealing' || state.status === 'dealer_turn') {
-                        seat.state = 'stood';
+                        seat.state = 'stood'; // 🛡️ 玩家斷線強制停牌
                         if (state.status === 'playing' && state.currentSeatIndex === idx) advanceTurn = true;
                     } else {
                         state.seats[idx] = null; 
@@ -947,7 +965,7 @@ io.on('connection', (socket) => {
 
             let onlineIds = Object.keys(state.players);
             if (onlineIds.length === 0) {
-                if(roomTimers[roomId]) clearInterval(roomTimers[roomId]);
+                clearAllTimers(roomId);
                 delete rooms[roomId]; 
             } else {
                 if (isHost) {
@@ -957,7 +975,10 @@ io.on('connection', (socket) => {
                         io.to(roomId).emit('error_msg', "莊家已斷線！權限自動移交給下一位玩家。");
                     }
                 }
-                if (advanceTurn) nextPlayerTurn(roomId);
+                if (advanceTurn) {
+                    clearAllTimers(roomId); // 🛡️ 防卡死
+                    nextPlayerTurn(roomId);
+                }
                 else sendSanitizedState(roomId);
             }
         }
