@@ -184,6 +184,7 @@
         .float-text { position: absolute; font-weight: 900; font-size: 2em; text-shadow: 0 2px 5px #000; z-index: 9999; animation: floatUp 1.5s ease-out forwards; pointer-events: none; white-space:nowrap;}
         @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-50px); opacity: 0; } }
 
+        /* 中間大彈窗 */
         .total-pnl-popup { 
             position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.8); 
             background: rgba(0,0,0,0.85); border: 2px solid var(--gold); padding: 20px 40px; 
@@ -193,11 +194,23 @@
         }
         @keyframes popIn { 0% { transform: translateX(-50%) scale(0.5) translateY(-20px); opacity:0;} 100% { transform: translateX(-50%) scale(1) translateY(0); opacity:1;} }
 
+        /* 🚀 新增：左下角常駐上一局盈虧面板 🚀 */
+        .prev-pnl-widget { 
+            position: absolute; bottom: 30px; left: 30px; 
+            background: rgba(10,10,10,0.85); backdrop-filter: blur(10px); 
+            border: 1px solid var(--gold); border-radius: 12px; 
+            padding: 10px 20px; z-index: 90; display: none; 
+            flex-direction: column; align-items: center; box-shadow: 0 10px 20px rgba(0,0,0,0.8);
+        }
+        .prev-pnl-title { font-size: 0.75em; color: #A0A0A0; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; font-weight: bold; }
+        .prev-pnl-value { font-size: 1.8em; font-weight: 900; font-family: 'Cinzel'; }
+
         .modal-item { background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%); border: 1px solid rgba(255,215,0,0.3); border-radius: 12px; padding: 15px; cursor: pointer; transition: 0.3s; text-align: left; position: relative; overflow: hidden; margin-bottom:10px;}
         .modal-item:hover { background: rgba(255,215,0,0.1); border-color: var(--gold); transform: translateY(-2px);}
         .modal-item.selected { background: rgba(255,215,0,0.2); border-color: var(--gold); box-shadow: 0 0 15px rgba(255,215,0,0.5);}
         .modal-item.selected::after { content: '✅'; position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 1.5em; }
 
+        /* 📱 手機版 RWD 📱 */
         @media (max-width: 768px) {
             body { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
             .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--gold); padding: 10px; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.95); z-index: 200; box-shadow: 0 4px 10px rgba(0,0,0,0.8);}
@@ -226,56 +239,40 @@
             .shoe .deck-count { font-size: 1em; margin-bottom: 2px; }
             .shoe .shoe-label { font-size: 0.5em; }
             
-            .seats-container { margin-bottom: 70px; padding: 0 2px;}
-            .seat-wrapper { flex: 1; display:flex; flex-direction:column; align-items:center; }
-            .seat-wrapper:nth-child(1) { transform: translateY(-25px) rotate(8deg); }
-            .seat-wrapper:nth-child(2) { transform: translateY(-10px) rotate(4deg); }
-            .seat-wrapper:nth-child(3) { transform: translateY(0px) rotate(0deg); }
-            .seat-wrapper:nth-child(4) { transform: translateY(-10px) rotate(-4deg); }
-            .seat-wrapper:nth-child(5) { transform: translateY(-25px) rotate(-8deg); }
+            .seats-container { gap: 2px; margin-bottom: 30px;}
+            .seat-wrapper { flex: 1; display:flex; justify-content:center;}
+            .seat-wrapper:nth-child(1) { transform: translateY(-100px) rotate(12deg); }
+            .seat-wrapper:nth-child(2) { transform: translateY(-60px) rotate(5deg); }
+            .seat-wrapper:nth-child(3) { transform: translateY(-30px) rotate(0deg); }
+            .seat-wrapper:nth-child(4) { transform: translateY(-60px) rotate(-5deg); }
+            .seat-wrapper:nth-child(5) { transform: translateY(-100px) rotate(-12deg); }
             
-            .seat { width: 100%; max-width: 65px; height: 90px; border-width: 2px; border-radius: 8px; }
+            .seat { width: 90%; height: 110px; border-width: 2px;}
+            .seat-name { font-size: 0.75em; bottom: -20px; width:100%; padding:2px;}
+            .seat-bet { font-size: 0.8em; bottom: -40px;}
+            .seat-score { min-width: 24px; height: 24px; font-size: 0.85em; padding: 0 4px; border-radius: 12px;}
+            .bet-behind-zone { bottom: -70px; width: 95%; height: 35px; font-size: 0.7em;}
+            .others-behind-list { bottom: -110px; }
             
-            .card-container { padding: 0; margin-top: 10px; }
-            .card { width: 38px; height: 55px; border-radius: 4px; border-width: 1px; margin-right: -20px; }
-            .card:last-child { margin-right: 0; }
+            .card-container { padding-left: 0; }
+            .card { width: 40px; height: 60px; margin-right: -25px;}
+            .card-corner-val { font-size: 12px; }
+            .card-suit-center { font-size: 20px; }
             
-            .card-corner { top: 1px; left: 2px; }
-            .card-corner-val { font-size: 11px; }
-            .card-corner-suit { font-size: 9px; }
-            .card-suit-center { font-size: 18px; }
+            .bottom-dock { width: 95%; bottom: 10px; border-radius: 25px; padding: 10px;}
+            .chip { width: 45px; height: 45px; font-size: 1em; border-width: 3px;}
+            .action-row button { padding: 8px 12px; font-size: 1em;}
 
-            .seat-name { font-size: 0.65em; bottom: -18px; width: 120%; padding: 2px; border-radius: 4px; white-space: nowrap;}
-            .seat-bet { font-size: 0.75em; bottom: -35px; padding: 2px 6px; border-radius: 6px; }
-            
-            .bet-behind-zone { bottom: -70px; width: 120%; height: 25px; font-size: 0.6em; border-radius: 4px; border-width: 1px; }
-            .others-behind-list { bottom: -95px; width: 140%; }
-            .others-behind-list div { font-size: 0.55em; padding: 1px 4px; margin-top: 1px; }
-
-            .bj-anim, .dd-anim { font-size: 1.2em; text-shadow: 0 0 10px #000; }
-            .bust-stamp { font-size: 1.2em; padding: 2px 8px; border-width: 2px; border-radius: 6px;}
-
-            .bottom-dock { width: 96%; bottom: 10px; border-radius: 20px; padding: 10px; min-width: unset;}
-            #resultMsg { font-size: 0.9em; margin-bottom: 5px; white-space: normal; text-align: center; line-height: 1.2;}
-            .chips-area { gap: 5px; margin-bottom: 8px; }
-            .chip { width: 40px; height: 40px; font-size: 0.9em; border-width: 2px;}
-            
-            .action-row { gap: 5px; }
-            .action-row button { padding: 8px 10px; font-size: 0.85em; border-radius: 15px;}
-            #chipsActionArea .action-row button { font-size: 0.8em; padding: 8px; }
-            .action-timer { font-size: 0.8em; padding: 3px 10px; margin-bottom: 5px; }
-
-            .total-pnl-popup { padding: 15px 30px; top: 35%; width: 80%;}
-            #totalPnlAmount { font-size: 2.5em; }
-            .glass-panel { width: 95%; padding: 20px; }
-            h1.title-gold { font-size: 2.2em; }
+            /* 🚀 手機版左下角盈虧面板：閃開底盤 🚀 */
+            .prev-pnl-widget { bottom: 140px; left: 10px; padding: 8px 15px; }
+            .prev-pnl-value { font-size: 1.4em; }
         }
     </style>
 </head>
 <body>
 
     <div class="overlay-screen" id="loginOverlay">
-        <h1 class="title-gold">BlackJack 21點 ♠️</h1>
+        <h1 class="title-gold">VIP 21點 ♠️</h1>
         <div class="glass-panel">
             <div class="input-group">
                 <label>身份登記 (玩家暱稱)</label>
@@ -353,6 +350,11 @@
                 <div id="totalPnlAmount" style="font-size:3.5em; font-weight:900; font-family:'Cinzel';">0</div>
             </div>
 
+            <div class="prev-pnl-widget" id="prevPnlWidget">
+                <div class="prev-pnl-title">上一局總盈虧</div>
+                <div class="prev-pnl-value" id="prevPnlValue">0</div>
+            </div>
+
             <div class="seats-container" id="seatsArea">
                 </div>
         </div>
@@ -413,7 +415,6 @@
         let selectedBetTarget = null; 
         let selectedNextDealerId = null;
         
-        // 🚀 動畫記憶系統 (防止重複跳出或中斷) 🚀
         let knownBusts = new Map();
         let knownBJs = new Map();
         let knownDDs = new Map();
@@ -593,8 +594,6 @@
         });
 
         socket.on('play_card_sfx', () => { sfx.card(); });
-
-        // 🚀 只保留純音效，動畫交給時間軸重繪系統 🚀
         socket.on('player_blackjack', () => { try { sfx.bj(); } catch(e){} });
         socket.on('player_double_down', () => { try { sfx.dd(); } catch(e){} });
         socket.on('player_bust', () => { try { sfx.bust(); } catch(e){} });
@@ -616,7 +615,7 @@
                     floatText.style.top = `${sRect.top}px`;
                     
                     if(res.result === 'push') {
-                        floatText.innerText = `+0`;
+                        floatText.innerText = `+0 (平手)`;
                         floatText.style.color = '#cbd5e1';
                     } else if(res.result === 'won') {
                         floatText.innerText = `+${res.amount}`;
@@ -658,17 +657,36 @@
                     let myTotal = data.playerHandTotalPnL[socket.id];
                     if (myTotal !== undefined) {
                         try {
+                            // 🚀 同時更新：中間大彈窗 與 左下角常駐面板 🚀
                             let popup = document.getElementById('totalPnlPopup');
                             let amtEl = document.getElementById('totalPnlAmount');
+                            
+                            let prevWidget = document.getElementById('prevPnlWidget');
+                            let prevVal = document.getElementById('prevPnlValue');
+
                             if (myTotal === 0) {
-                                amtEl.innerText = "+0";
+                                amtEl.innerText = "+0 (平手)";
                                 amtEl.style.color = '#cbd5e1';
+                                prevVal.innerText = "+0";
+                                prevVal.style.color = '#cbd5e1';
                             } else {
-                                amtEl.innerText = myTotal > 0 ? `+${myTotal}` : myTotal;
-                                amtEl.style.color = myTotal > 0 ? 'var(--win-green)' : 'var(--lose-red)';
+                                let sign = myTotal > 0 ? '+' : '';
+                                let color = myTotal > 0 ? 'var(--win-green)' : 'var(--lose-red)';
+                                
+                                amtEl.innerText = `${sign}${myTotal}`;
+                                amtEl.style.color = color;
+                                
+                                prevVal.innerText = `${sign}${myTotal}`;
+                                prevVal.style.color = color;
                             }
+                            
+                            // 顯示彈窗 2.5 秒
                             popup.style.display = 'block';
                             setTimeout(() => { popup.style.display = 'none'; }, 2500);
+
+                            // 顯示左下角常駐面板
+                            prevWidget.style.display = 'flex';
+
                         } catch(e){}
                     }
                 }, 1000);
@@ -704,44 +722,23 @@
                         
                         let waitingMsg = (seat.state === 'waiting_next' && globalState.status === 'playing') ? `<div style="position:absolute; top:40%; color:rgba(255,255,255,0.5); font-weight:bold; width:100%; text-align:center;">⏳ 等待下局</div>` : '';
                         
-                        // 🚀 完美的動畫時間軸記憶系統 🚀
                         let bustClass = '';
-                        let bustStampHtml = '';
                         if (seat.state === 'bust') {
                             bustClass = 'seat-bust-static';
-                            if (!knownBusts.has(i)) knownBusts.set(i, Date.now());
-                            let age = Date.now() - knownBusts.get(i);
-                            if (age < 1000) {
-                                bustStampHtml = `<div class="bust-stamp" style="animation: stamp-drop 0.4s ease-in forwards; animation-delay: -${age}ms;">BUST</div>`;
-                                if (age < 600) bustClass += ' seat-bust-anim';
-                            } else {
-                                bustStampHtml = `<div class="bust-stamp" style="opacity: 1; transform: translate(-50%, -50%) rotate(-15deg) scale(1);">BUST</div>`;
-                            }
-                        }
-
-                        let isBJ = (seat.cards && seat.cards.length === 2 && seat.score === 21);
-                        let bjHtml = '';
-                        if (isBJ) {
-                            if (!knownBJs.has(i)) knownBJs.set(i, Date.now());
-                            let age = Date.now() - knownBJs.get(i);
-                            if (age < 3000) {
-                                bjHtml = `<div class="bj-anim" style="animation: bj-pop 3s forwards; animation-delay: -${age}ms;">✨ BLACKJACK</div>`;
+                            if (!knownBusts.has(i)) {
+                                bustClass += ' seat-bust-anim';
+                                knownBusts.add(i);
                             }
                         }
 
                         let doubleClass = seat.isDoubleDown ? 'seat-double-down' : '';
-                        let ddHtml = '';
-                        if (seat.isDoubleDown) {
-                            if (!knownDDs.has(i)) knownDDs.set(i, Date.now());
-                            let age = Date.now() - knownDDs.get(i);
-                            if (age < 3000) {
-                                ddHtml = `<div class="dd-anim" style="animation: dd-pop 3s forwards; animation-delay: -${age}ms;">✖️2 DOUBLE!</div>`;
-                            }
-                        }
 
                         let isBehindSelected = (selectedBetTarget && selectedBetTarget.type === 'behind' && selectedBetTarget.index === i);
                         let behindActiveClass = isBehindSelected ? 'selected-for-bet' : '';
                         
+                        // 🚀 核心：超顯眼保險頭注標記 🚀
+                        let mainInsBadge = seat.insurance > 0 ? `<span style="color:#4CAF50; font-size:0.85em; text-shadow: 0 0 5px #4CAF50; margin-left: 5px;">🛡️保險 $${seat.insurance}</span>` : '';
+
                         let behindDisplayAmount = 0;
                         let behindStr = "買馬區";
                         if(seat.betBehind && seat.betBehind[socket.id]) {
@@ -764,11 +761,16 @@
                         if(seat.betBehind) {
                             for(let specId in seat.betBehind) {
                                 let amt = seat.betBehind[specId].amount || 0;
+                                let specInsAmt = seat.betBehind[specId].insurance || 0;
+                                
                                 if(amt > 0) {
                                     let specP = globalState.players[specId] || (globalState.offlinePlayers && globalState.offlinePlayers.find(p => p.oldId === specId));
                                     let specName = specP ? specP.name : "玩家";
                                     let isMe = (specId === socket.id) ? '(我)' : '';
-                                    specList.push(`<div style="background:rgba(0,0,0,0.6); padding:3px 8px; border-radius:6px; font-size:0.85em; color:#cbd5e1; margin-top:2px; white-space:nowrap; border:1px solid #444;">👤 ${specName}${isMe}: $${amt}</div>`);
+                                    // 買馬名單也會掛上綠色保險盾牌
+                                    let specInsStr = specInsAmt > 0 ? ` <span style="color:#4CAF50;">(🛡️保險 $${specInsAmt})</span>` : '';
+                                    
+                                    specList.push(`<div style="background:rgba(0,0,0,0.6); padding:3px 8px; border-radius:6px; font-size:0.85em; color:#cbd5e1; margin-top:2px; white-space:nowrap; border:1px solid #444;">👤 ${specName}${isMe}: $${amt}${specInsStr}</div>`);
                                 }
                             }
                         }
@@ -779,14 +781,14 @@
                         seatsHtml += `
                             <div class="seat ${activeClass} ${bustClass} ${doubleClass}" id="seat_${i}" onclick="handleSeatClick(${i})">
                             ${scoreBadge}
-                            ${bjHtml}
-                            ${ddHtml}
-                            ${bustStampHtml}
+                            <div class="bj-anim" id="seat_bj_${i}"></div>
+                            <div class="dd-anim" id="seat_dd_${i}"></div>
+                            <div class="bust-stamp">BUST</div>
                             ${othersBehindHtml}
                             <div class="card-container" style="min-height:75px;">${cardsHtml}</div>
                             ${waitingMsg}
                             <div class="seat-name">${nameDisplay}</div>
-                            <div class="seat-bet">Bet: $${seat.bet || 0}</div>
+                            <div class="seat-bet">Bet: $${seat.bet || 0}${mainInsBadge}</div>
                             ${betBehindHtml}
                         </div>`;
                     }
@@ -806,11 +808,16 @@
                 amIHost = (state.hostId === socket.id);
                 currentStatus = state.status;
 
-                // 新局清空動畫記憶
                 if (state.status === 'betting') {
                     knownBusts.clear();
                     knownBJs.clear();
                     knownDDs.clear();
+                }
+
+                // 🚀 當正式開始發牌 (dealing) 或洗牌重置 (waiting) 時，隱藏上一局盈虧面板
+                if (state.status === 'dealing' || state.status === 'waiting') {
+                    let pWidget = document.getElementById('prevPnlWidget');
+                    if (pWidget) pWidget.style.display = 'none';
                 }
 
                 if(document.getElementById('deckCountDisplay')) document.getElementById('deckCountDisplay').innerText = state.deck.length;
@@ -838,7 +845,7 @@
                     selectedBetTarget = null; 
                 }
 
-                // 🚀 莊家專屬天眼：玩家餘額顯示 🚀
+                // 🚀 莊家專屬天眼：玩家餘額透視 🚀
                 let pnlHtml = '';
                 for(let id in state.players) {
                     let p = state.players[id];
@@ -902,9 +909,6 @@
 
                 if(document.getElementById('adminControls')) {
                     document.getElementById('adminControls').style.display = (amIDealer && (state.status === 'waiting' || state.status === 'settled')) ? 'flex' : 'none';
-                }
-                if(document.getElementById('btnEndSession')) {
-                    document.getElementById('btnEndSession').style.display = (amIHost && (state.status === 'waiting' || state.status === 'settled')) ? 'block' : 'none';
                 }
 
                 if(document.getElementById('hostControls')) document.getElementById('hostControls').style.display = 'none';
