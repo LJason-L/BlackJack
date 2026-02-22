@@ -23,6 +23,7 @@ function generateRoomId() {
 function clearAllTimers(roomId) {
     if(roomTimers[roomId]) { clearInterval(roomTimers[roomId]); delete roomTimers[roomId]; }
     if(roomTimers[roomId + '_timeout']) { clearTimeout(roomTimers[roomId + '_timeout']); delete roomTimers[roomId + '_timeout']; }
+    if(roomTimers[roomId + '_bust_timeout']) { clearTimeout(roomTimers[roomId + '_bust_timeout']); delete roomTimers[roomId + '_bust_timeout']; }
 }
 
 function calculateScore(cards) {
@@ -111,7 +112,6 @@ function sendSanitizedState(roomId) {
                 s.seats.forEach(seat => {
                     if (seat && seat.cards) {
                         seat.score = calculateScore(seat.cards); 
-                        // 🚀 點數坍縮邏輯：停牌、爆牌、結算或拿到21點時，強制顯示最終數字 🚀
                         let visibleCards = seat.cards.filter(c => !c.hidden);
                         if (s.status === 'settled' || seat.state === 'stood' || seat.state === 'bust' || seat.score === 21) {
                             seat.scoreDisplay = calculateScore(visibleCards).toString();
@@ -136,7 +136,6 @@ function sendSanitizedState(roomId) {
                     }
                 } else {
                     s.dealerScore = calculateScore(s.dealerCards);
-                    // 莊家點數坍縮
                     if (s.status === 'settled' || s.dealerState === 'stood' || s.dealerState === 'bust' || s.dealerScore === 21) {
                         s.dealerScoreDisplay = s.dealerScore.toString();
                     } else {
@@ -297,7 +296,7 @@ function dealInitialCards(roomId) {
                 if(seat) {
                     seat.score = calculateScore(seat.cards);
                     if (seat.score === 21) {
-                        seat.state = 'blackjack'; // 狀態更新後會觸發分數坍縮
+                        seat.state = 'blackjack'; 
                         io.to(roomId).emit('player_blackjack', idx); 
                     }
                 }
@@ -368,7 +367,8 @@ function resolveInsurance(roomId) {
 function nextPlayerTurn(roomId) {
     let state = rooms[roomId];
     if(!state) return;
-    clearAllTimers(roomId); // 🛡️ 進入下一回合前，絕對清空所有計時器，防止重疊 🛡️
+    clearAllTimers(roomId); 
+    clearNewFlags(roomId); // 🌟 終極修復：換人時，強制抹除上一家所有的飛牌標記，確保不會復發！
 
     state.currentSeatIndex--;
     while (state.currentSeatIndex >= 0) {
@@ -406,6 +406,7 @@ function dealerTurn(roomId) {
     let state = rooms[roomId];
     if(!state) return;
     clearAllTimers(roomId);
+    clearNewFlags(roomId); // 🌟 確保換莊家時，玩家的牌也不會再飛
     
     state.status = 'dealer_turn';
 
@@ -466,7 +467,7 @@ function dealerTurn(roomId) {
                     }
                 }catch(e){ clearInterval(drawInterval); }
             }, 1200); 
-            roomTimers[roomId] = drawInterval; // 加入清理清單
+            roomTimers[roomId] = drawInterval; 
         }catch(e){}
     }, 1500);
 }
@@ -789,7 +790,7 @@ io.on('connection', (socket) => {
             let seat = state.seats[seatIndex];
             if(!seat || seat.ownerId !== socket.id) return;
             
-            clearAllTimers(roomId); // 🛡️ 防卡死：操作瞬間清空所有殘留計時器
+            clearAllTimers(roomId); 
 
             clearNewFlags(roomId);
             let card = drawCard(roomId, false);
@@ -801,10 +802,12 @@ io.on('connection', (socket) => {
                 seat.state = 'bust';
                 io.to(roomId).emit('player_bust', seatIndex);
                 sendSanitizedState(roomId);
+                autoClearAnimation(roomId, 800); // 🌟 補上：確保爆牌後撕除飛牌標籤
                 roomTimers[roomId + '_timeout'] = setTimeout(() => nextPlayerTurn(roomId), 1500);
             } else if (seat.score === 21) {
                 seat.state = 'stood';
                 sendSanitizedState(roomId);
+                autoClearAnimation(roomId, 800); // 🌟 補上：確保拿到 21 點後撕除飛牌標籤
                 roomTimers[roomId + '_timeout'] = setTimeout(() => nextPlayerTurn(roomId), 1000);
             } else {
                 sendSanitizedState(roomId);
@@ -834,7 +837,7 @@ io.on('connection', (socket) => {
             if(!seat || !player || seat.ownerId !== socket.id || seat.cards.length !== 2) return; 
 
             if (player.balance >= seat.bet) {
-                clearAllTimers(roomId); // 🛡️ 防卡死
+                clearAllTimers(roomId); 
                 
                 player.balance -= seat.bet;
                 seat.bet *= 2; 
@@ -856,6 +859,7 @@ io.on('connection', (socket) => {
                 }
                 
                 sendSanitizedState(roomId);
+                autoClearAnimation(roomId, 800); // 🌟 補上：確保 Double 飛牌後撕除標籤
                 roomTimers[roomId + '_timeout'] = setTimeout(() => nextPlayerTurn(roomId), 2000);
             } else {
                 socket.emit('error_msg', "餘額不足以雙倍下注！");
@@ -868,7 +872,7 @@ io.on('connection', (socket) => {
         if (state && state.status === 'playing' && state.currentSeatIndex === seatIndex) {
             if (state.seats[seatIndex] && state.seats[seatIndex].ownerId === socket.id) {
                 state.seats[seatIndex].state = 'stood';
-                clearAllTimers(socket.roomId); // 🛡️ 防卡死
+                clearAllTimers(socket.roomId); 
                 nextPlayerTurn(socket.roomId);
             }
         }
@@ -954,7 +958,7 @@ io.on('connection', (socket) => {
             state.seats.forEach((seat, idx) => {
                 if (seat && seat.ownerId === socket.id) {
                     if (state.status === 'playing' || state.status === 'dealing' || state.status === 'dealer_turn') {
-                        seat.state = 'stood'; // 🛡️ 玩家斷線強制停牌
+                        seat.state = 'stood'; 
                         if (state.status === 'playing' && state.currentSeatIndex === idx) advanceTurn = true;
                     } else {
                         state.seats[idx] = null; 
@@ -976,7 +980,7 @@ io.on('connection', (socket) => {
                     }
                 }
                 if (advanceTurn) {
-                    clearAllTimers(roomId); // 🛡️ 防卡死
+                    clearAllTimers(roomId); 
                     nextPlayerTurn(roomId);
                 }
                 else sendSanitizedState(roomId);
