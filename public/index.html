@@ -384,7 +384,7 @@
 
                 <div id="insuranceControls" style="display:none; flex-direction:column; align-items:center; width:100%;">
                     <div class="action-timer" id="insTimerText">⏳ 剩餘 10 秒</div>
-                    <div style="color:#FFF; font-size:0.9em; margin-bottom:10px; text-align:center;">莊家開出 A<br>是否為此座位購買保險？</div>
+                    <div style="color:#FFF; font-size:0.9em; margin-bottom:10px; text-align:center;">莊家開出 A<br>是否購買保險？</div>
                     <div class="action-row">
                         <button class="btn-primary" onclick="emitInsurance(true)">🛡️ 買保險</button>
                         <button class="btn-secondary" style="background:#555;" onclick="emitInsurance(false)">不買</button>
@@ -414,8 +414,10 @@
         let selectedBetTarget = null; 
         let selectedNextDealerId = null;
         
-        // 🚀 修正語法錯誤：使用真正的 Set 而非 Map 🚀
-        let knownBusts = new Set();
+        // 🚀 核心修復：正確使用 Map 記錄時間軸，完美解決重複跳出與閃爍 🚀
+        let knownBusts = new Map();
+        let knownBJs = new Map();
+        let knownDDs = new Map();
 
         let audioCtx = null;
         function getAudioContext() { if (!audioCtx) { try { const AudioContext = window.AudioContext || window.webkitAudioContext; if(AudioContext) audioCtx = new AudioContext(); } catch(e) {} } return audioCtx; }
@@ -593,33 +595,9 @@
 
         socket.on('play_card_sfx', () => { sfx.card(); });
         
-        // 🚀 BJ 與 Double 獨立動畫綁定 (3秒完美淡出) 🚀
-        socket.on('player_blackjack', (seatIdx) => {
-            try {
-                sfx.bj();
-                let el = document.getElementById(`seat_bj_${seatIdx}`);
-                if(el) {
-                    el.innerHTML = "✨ BLACKJACK";
-                    el.style.animation = 'none';
-                    el.offsetHeight; 
-                    el.style.animation = "bj-pop 3s forwards";
-                }
-            }catch(e){}
-        });
-
-        socket.on('player_double_down', (seatIdx) => {
-            try {
-                sfx.dd();
-                let el = document.getElementById(`seat_dd_${seatIdx}`);
-                if(el) {
-                    el.innerHTML = "✖️2 DOUBLE!";
-                    el.style.animation = 'none';
-                    el.offsetHeight; 
-                    el.style.animation = "dd-pop 3s forwards";
-                }
-            }catch(e){}
-        });
-
+        // 音效依然從 socket 接收觸發
+        socket.on('player_blackjack', () => { try { sfx.bj(); } catch(e){} });
+        socket.on('player_double_down', () => { try { sfx.dd(); } catch(e){} });
         socket.on('player_bust', () => { try { sfx.bust(); } catch(e){} });
 
         socket.on('hand_settled_animation', (data) => {
@@ -743,17 +721,40 @@
                         
                         let waitingMsg = (seat.state === 'waiting_next' && globalState.status === 'playing') ? `<div style="position:absolute; top:40%; color:rgba(255,255,255,0.5); font-weight:bold; width:100%; text-align:center;">⏳ 等待下局</div>` : '';
                         
+                        // 🚀 核心修復：完美的動畫時間軸記憶系統 🚀
                         let bustClass = '';
+                        let bustStampHtml = '';
                         if (seat.state === 'bust') {
                             bustClass = 'seat-bust-static';
-                            // 🚀 修復語法錯誤：使用 Set 的 .has() 與 .add() 🚀
-                            if (!knownBusts.has(i)) {
-                                bustClass += ' seat-bust-anim';
-                                knownBusts.add(i); 
+                            if (!knownBusts.has(i)) knownBusts.set(i, Date.now());
+                            let age = Date.now() - knownBusts.get(i);
+                            if (age < 1000) {
+                                bustStampHtml = `<div class="bust-stamp" style="animation: stamp-drop 0.4s ease-in forwards; animation-delay: -${age}ms;">BUST</div>`;
+                                if (age < 600) bustClass += ' seat-bust-anim';
+                            } else {
+                                bustStampHtml = `<div class="bust-stamp" style="opacity: 1; transform: translate(-50%, -50%) rotate(-15deg) scale(1);">BUST</div>`;
+                            }
+                        }
+
+                        let isBJ = (seat.cards && seat.cards.length === 2 && seat.score === 21);
+                        let bjHtml = '';
+                        if (isBJ) {
+                            if (!knownBJs.has(i)) knownBJs.set(i, Date.now());
+                            let age = Date.now() - knownBJs.get(i);
+                            if (age < 3000) { // 停留 3 秒
+                                bjHtml = `<div class="bj-anim" style="animation: bj-pop 3s forwards; animation-delay: -${age}ms;">✨ BLACKJACK</div>`;
                             }
                         }
 
                         let doubleClass = seat.isDoubleDown ? 'seat-double-down' : '';
+                        let ddHtml = '';
+                        if (seat.isDoubleDown) {
+                            if (!knownDDs.has(i)) knownDDs.set(i, Date.now());
+                            let age = Date.now() - knownDDs.get(i);
+                            if (age < 3000) { // 停留 3 秒
+                                ddHtml = `<div class="dd-anim" style="animation: dd-pop 3s forwards; animation-delay: -${age}ms;">✖️2 DOUBLE!</div>`;
+                            }
+                        }
 
                         let isBehindSelected = (selectedBetTarget && selectedBetTarget.type === 'behind' && selectedBetTarget.index === i);
                         let behindActiveClass = isBehindSelected ? 'selected-for-bet' : '';
@@ -798,12 +799,13 @@
                             othersBehindHtml = `<div class="others-behind-list">${specList.join('')}</div>`;
                         }
 
+                        // 注入動態動畫 HTML
                         seatsHtml += `
                             <div class="seat ${activeClass} ${bustClass} ${doubleClass}" id="seat_${i}" onclick="handleSeatClick(${i})">
                             ${scoreBadge}
-                            <div class="bj-anim" id="seat_bj_${i}"></div>
-                            <div class="dd-anim" id="seat_dd_${i}"></div>
-                            <div class="bust-stamp">BUST</div>
+                            ${bjHtml}
+                            ${ddHtml}
+                            ${bustStampHtml}
                             ${othersBehindHtml}
                             <div class="card-container" style="min-height:75px;">${cardsHtml}</div>
                             ${waitingMsg}
@@ -828,9 +830,10 @@
                 amIHost = (state.hostId === socket.id);
                 currentStatus = state.status;
 
-                // 新局清空動畫記憶
                 if (state.status === 'betting') {
                     knownBusts.clear();
+                    knownBJs.clear();
+                    knownDDs.clear();
                 }
 
                 if (state.status === 'dealing' || state.status === 'waiting') {
