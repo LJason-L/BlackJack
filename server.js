@@ -442,11 +442,15 @@ function dealerTurn(roomId) {
     }, 1500);
 }
 
+// 🛡️ 史詩級修復：無敵鐵血判定系統 🛡️
 function settleGame(roomId) {
     let state = rooms[roomId];
     if(!state) return;
     state.status = 'settled';
-    let dScore = state.dealerScore > 21 ? 0 : state.dealerScore;
+    
+    // 重新計算確保點數絕對精準
+    state.dealerScore = calculateScore(state.dealerCards);
+    let dScore = state.dealerScore > 21 ? 0 : state.dealerScore; // 莊家爆牌算 0 點
     let dIsBJ = (state.dealerCards.length === 2 && state.dealerScore === 21);
 
     let handResults = []; 
@@ -457,17 +461,31 @@ function settleGame(roomId) {
     state.seats.forEach((seat, idx) => {
         if (!seat || seat.state === 'waiting_next' || (seat.bet === 0 && Object.keys(seat.betBehind).length === 0)) return;
 
-        let pIsBJ = (seat.cards.length === 2 && seat.score === 21);
+        seat.score = calculateScore(seat.cards);
+        let pScore = seat.score;
+        let pIsBJ = (seat.cards.length === 2 && pScore === 21);
         let multiplier = 0; 
 
-        if (seat.state === 'bust') { multiplier = -1; } 
-        else if (pIsBJ && dIsBJ) { multiplier = 0; }
-        else if (pIsBJ && !dIsBJ) { multiplier = 1.5; }
-        else if (!pIsBJ && dIsBJ) { multiplier = -1; }
-        else {
-            if (state.dealerState === 'bust') multiplier = 1;
-            else if (seat.score > dScore) multiplier = 1;
-            else if (seat.score < dScore) multiplier = -1;
+        // 🎲 嚴格實體賭場判定規則 🎲
+        if (pScore > 21) { 
+            // 規則1: 玩家爆牌，不管莊家幾點，玩家一定輸 (直接扣錢)
+            multiplier = -1; 
+        } else if (pIsBJ && dIsBJ) {
+            // 規則2: 雙方都是 BJ -> 平手退注
+            multiplier = 0; 
+        } else if (pIsBJ && !dIsBJ) {
+            // 規則3: 只有玩家 BJ -> 賠 1.5 倍
+            multiplier = 1.5; 
+        } else if (!pIsBJ && dIsBJ) {
+            // 規則4: 只有莊家 BJ -> 玩家全輸
+            multiplier = -1; 
+        } else if (state.dealerScore > 21) {
+            // 規則5: 莊家爆牌 (且玩家沒爆) -> 玩家贏 1 倍
+            multiplier = 1;
+        } else {
+            // 規則6: 都沒爆牌，沒 BJ，單純比大小
+            if (pScore > dScore) multiplier = 1;
+            else if (pScore < dScore) multiplier = -1;
             else multiplier = 0;
         }
 
@@ -475,12 +493,15 @@ function settleGame(roomId) {
         let dealer = state.players[state.dealerId] || state.offlinePlayers.find(p => p.oldId === state.dealerId);
         
         let seatTotalPnL = 0;
+        
+        // 結算保險
         if (seat.insurance > 0) {
             let insResult = dIsBJ ? (seat.insurance * 2) : -seat.insurance;
             if (owner) { owner.balance += (dIsBJ ? (seat.insurance + insResult) : 0); owner.pnl += insResult; playerHandTotalPnL[owner.oldId || seat.ownerId] += insResult;}
             if (dealer) { dealer.balance -= insResult; dealer.pnl -= insResult; playerHandTotalPnL[dealer.oldId || state.dealerId] -= insResult; }
         }
 
+        // 結算主位
         if (seat.bet > 0) {
             let pnlChange = seat.bet * multiplier;
             seatTotalPnL += pnlChange;
@@ -500,6 +521,7 @@ function settleGame(roomId) {
             seat.state = 'push';
         }
 
+        // 結算買馬
         for (let specId in seat.betBehind) {
             let spec = state.players[specId] || state.offlinePlayers.find(p => p.oldId === specId);
             let specBetObj = seat.betBehind[specId] || { amount: 0, insurance: 0 };
@@ -667,8 +689,11 @@ io.on('connection', (socket) => {
                     seat.bet += data.amount;
                 } else socket.emit('error_msg', "餘額不足！");
             } else if (data.type === 'behind' && seat.ownerId !== socket.id) {
+                if (seat.bet === 0) return socket.emit('error_msg', "主位玩家尚未下注，無法買馬！");
+                
                 if(!seat.betBehind[socket.id]) seat.betBehind[socket.id] = { amount: 0, insurance: 0, isConfirmed: false };
                 if (seat.betBehind[socket.id].isConfirmed) return;
+                
                 if (player.balance >= data.amount) {
                     player.balance -= data.amount;
                     seat.betBehind[socket.id].amount += data.amount;
@@ -858,7 +883,6 @@ io.on('connection', (socket) => {
         }
     }));
 
-    // 🚀 放寬權限：Waiting 跟 Settled 都可以按總結算 🚀
     socket.on('end_session', safe(() => {
         let roomId = socket.roomId;
         let state = rooms[roomId];

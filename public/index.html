@@ -38,7 +38,7 @@
         .balance-val { color: var(--gold); font-size: 2em; font-weight: 900; font-family: 'Cinzel';}
         
         .pnl-list { flex-grow: 1; overflow-y: auto; font-weight: bold; }
-        .pnl-item { display: flex; justify-content: space-between; padding: 12px 5px; border-bottom: 1px solid rgba(255,255,255,0.05);}
+        .pnl-item { display: flex; justify-content: space-between; padding: 12px 5px; border-bottom: 1px solid rgba(255,255,255,0.05); align-items:center;}
         .text-win { color: var(--win-green); }
         .text-lose { color: var(--lose-red); }
 
@@ -46,6 +46,7 @@
 
         .main-game { flex-grow: 1; display: flex; flex-direction: column; position: relative;}
         
+        /* 嚴格保留版面設定 */
         .casino-table { 
             flex-grow: 1; background: var(--table-green); 
             border-radius: 40px; box-shadow: inset 0 0 100px rgba(0,0,0,1); 
@@ -85,10 +86,9 @@
         .seat.active-turn { border-color: var(--win-green); box-shadow: 0 0 20px rgba(0,230,118,0.5); background: rgba(0,230,118,0.1);}
         .seat-double-down { border-color: #A855F7 !important; box-shadow: 0 0 20px rgba(168, 85, 247, 0.6) !important; background: rgba(168, 85, 247, 0.15) !important; }
 
+        /* 動畫系統 (由 JS Maps 控制) */
         .seat-bust-static { border-color: var(--lose-red) !important; background: rgba(0,0,0,0.7); }
-        .seat-bust-static .bust-stamp { opacity: 1; transform: translate(-50%, -50%) rotate(-15deg) scale(1); }
         .seat-bust-anim { animation: bust-shake 0.6s forwards; }
-        .seat-bust-anim .bust-stamp { animation: stamp-drop 0.4s ease-in forwards; }
         
         @keyframes bust-shake {
             0% { transform: translateX(0); }
@@ -122,13 +122,13 @@
         .empty-seat { justify-content: center; color: rgba(255,255,255,0.5); font-weight:bold; border-style: dashed;}
         .empty-seat:hover { background: rgba(255,215,0,0.1); border-color: var(--gold);}
 
-        /* 🚀 牌張完美置中演算法 (徹底移除 padding-left，改用 margin-right) 🚀 */
-        .card-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; width: 100%; padding: 0; } 
+        /* 牌張完美置中 絕對保留 */
+        .card-container { display: flex; justify-content: center; align-items: center; margin-top: 15px; width: 100%; padding: 0;} 
         .card { 
             width: 65px; height: 95px; border-radius: 6px; box-shadow: -2px 2px 8px rgba(0,0,0,0.5); 
             background: white; color: black; margin-right: -35px; position: relative;
         }
-        .card:last-child { margin-right: 0; } /* 最後一張牌不偏移 */
+        .card:last-child { margin-right: 0; } 
         
         .card-hidden { background: repeating-linear-gradient(45deg, #1e3a8a, #1e3a8a 10px, #1e40af 10px, #1e40af 20px); border: 3px solid white;}
         .card-hidden .card-content { display: none; }
@@ -141,11 +141,12 @@
         @keyframes deal-fly { 0% { transform: translate(300px, -300px) scale(0.5) rotate(180deg); opacity: 0; } 100% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; } }
         .card-new { animation: deal-fly 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
-        .bj-anim { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); color: var(--gold); font-family: 'Cinzel'; font-size: 2em; font-weight: 900; text-shadow: 0 0 15px #000, 0 0 30px var(--gold); z-index: 50; pointer-events: none;}
-        @keyframes bj-pop { 0% { transform: translate(-50%, -50%) scale(0); opacity:0;} 20% { transform: translate(-50%, -50%) scale(1.3); opacity:1;} 80% { transform: translate(-50%, -50%) scale(1.1); opacity:1;} 100% { transform: translate(-50%, -50%) scale(1); opacity:0;} }
+        /* 動畫系統 CSS 修正 (3秒停留淡出) */
+        .bj-anim { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--gold); font-family: 'Cinzel'; font-size: 2em; font-weight: 900; text-shadow: 0 0 15px #000, 0 0 30px var(--gold); z-index: 50; pointer-events: none; opacity:0;}
+        @keyframes bj-pop { 0% { transform: translate(-50%, -50%) scale(0); opacity:0;} 10% { transform: translate(-50%, -50%) scale(1.3); opacity:1;} 20% { transform: translate(-50%, -50%) scale(1); opacity:1;} 80% { transform: translate(-50%, -50%) scale(1); opacity:1;} 100% { transform: translate(-50%, -50%) scale(1); opacity:0;} }
 
-        .dd-anim { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%) scale(0); color: #A855F7; font-family: 'Cinzel'; font-size: 2em; font-weight: 900; text-shadow: 0 0 15px #000, 0 0 20px #A855F7; z-index: 60; pointer-events: none; white-space: nowrap;}
-        @keyframes dd-pop { 0% { transform: translate(-50%, -50%) scale(0); opacity:0;} 20% { transform: translate(-50%, -50%) scale(1.3); opacity:1;} 80% { transform: translate(-50%, -50%) scale(1.1); opacity:1;} 100% { transform: translate(-50%, -50%) scale(1); opacity:0;} }
+        .dd-anim { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); color: #A855F7; font-family: 'Cinzel'; font-size: 2em; font-weight: 900; text-shadow: 0 0 15px #000, 0 0 20px #A855F7; z-index: 60; pointer-events: none; white-space: nowrap; opacity:0;}
+        @keyframes dd-pop { 0% { transform: translate(-50%, -50%) scale(0); opacity:0;} 10% { transform: translate(-50%, -50%) scale(1.3); opacity:1;} 20% { transform: translate(-50%, -50%) scale(1); opacity:1;} 80% { transform: translate(-50%, -50%) scale(1); opacity:1;} 100% { transform: translate(-50%, -50%) scale(1); opacity:0;} }
 
         .bottom-dock { 
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); 
@@ -197,11 +198,9 @@
         .modal-item.selected { background: rgba(255,215,0,0.2); border-color: var(--gold); box-shadow: 0 0 15px rgba(255,215,0,0.5);}
         .modal-item.selected::after { content: '✅'; position: absolute; right: 15px; top: 50%; transform: translateY(-50%); font-size: 1.5em; }
 
-        /* 📱 手機版 RWD (精準完美置中) 📱 */
         @media (max-width: 768px) {
             body { flex-direction: column; overflow-y: auto; overflow-x: hidden; }
-            
-            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--gold); padding: 10px; display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.95); z-index: 200; box-shadow: 0 4px 10px rgba(0,0,0,0.8);}
+            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--gold); padding: 10px; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; background: rgba(10,10,10,0.95); z-index: 200; box-shadow: 0 4px 10px rgba(0,0,0,0.8);}
             .room-tag { margin-bottom: 0; padding: 5px 10px; font-size: 0.8em; flex: 0.4; }
             .balance-box { margin-bottom: 0; padding: 5px; flex: 0.55; display: flex; flex-direction: column; align-items: center; justify-content: center;}
             .balance-title { font-size: 0.6em; }
@@ -214,7 +213,7 @@
 
             .req-panel { left: 5px; top: 120px; right: 5px; padding: 10px; }
             
-            .casino-table { padding: 10px 5px 220px 5px; border-radius: 0 0 30px 30px; } 
+            .casino-table { padding: 10px 5px 280px 5px; border-radius: 0 0 30px 30px; } 
             .table-text { top: 35%; width: 100%; }
             .table-text h2 { font-size: 2.2em; letter-spacing: 2px; }
             .table-text p { font-size: 0.9em; }
@@ -237,7 +236,6 @@
             
             .seat { width: 100%; max-width: 65px; height: 90px; border-width: 2px; border-radius: 8px; }
             
-            /* 🚀 手機版牌張 徹底置中修正 🚀 */
             .card-container { padding: 0; margin-top: 10px; }
             .card { width: 38px; height: 55px; border-radius: 4px; border-width: 1px; margin-right: -20px; }
             .card:last-child { margin-right: 0; }
@@ -317,7 +315,7 @@
             <div class="pnl-list" id="playerList"></div>
         </div>
         <div class="admin-controls" id="adminControls" style="display:none;">
-            <button class="btn-red" id="btnEndSession" onclick="if(confirm('確定要結束這場牌局並進行總結算嗎？')) socket.emit('end_session')" style="width:100%;">🛑 終局總結算</button>
+            <button class="btn-red" id="btnEndSession" onclick="if(confirm('確定要結束這場牌局並進行總結算嗎？')) socket.emit('end_session')" style="display:none; width:100%; margin-bottom:10px;">🛑 終局總結算</button>
             <button style="background:transparent; border:1px solid #FF3366; color:#FF3366; width:100%;" onclick="if(confirm('確定強制重置牌桌？所有人的下注將被清空。')) socket.emit('force_reset')">🔄 強制重置</button>
         </div>
     </div>
@@ -415,7 +413,10 @@
         let selectedBetTarget = null; 
         let selectedNextDealerId = null;
         
-        let knownBusts = new Set();
+        // 🚀 動畫記憶系統 (防止重複跳出或中斷) 🚀
+        let knownBusts = new Map();
+        let knownBJs = new Map();
+        let knownDDs = new Map();
 
         let audioCtx = null;
         function getAudioContext() { if (!audioCtx) { try { const AudioContext = window.AudioContext || window.webkitAudioContext; if(AudioContext) audioCtx = new AudioContext(); } catch(e) {} } return audioCtx; }
@@ -593,35 +594,10 @@
 
         socket.on('play_card_sfx', () => { sfx.card(); });
 
-        socket.on('player_blackjack', (seatIdx) => {
-            try {
-                sfx.bj();
-                let el = document.getElementById(`seat_bj_${seatIdx}`);
-                if(el) {
-                    el.innerHTML = "✨ BLACKJACK";
-                    el.style.animation = "bj-pop 2s forwards";
-                }
-            }catch(e){}
-        });
-        
-        socket.on('player_double_down', (seatIdx) => {
-            try {
-                sfx.dd();
-                let el = document.getElementById(`seat_dd_${seatIdx}`);
-                if(el) {
-                    el.innerHTML = "✖️2 DOUBLE!";
-                    el.style.animation = 'none';
-                    el.offsetHeight; 
-                    el.style.animation = "dd-pop 1.5s forwards";
-                }
-            }catch(e){}
-        });
-
-        socket.on('player_bust', (seatIdx) => {
-            try {
-                sfx.bust();
-            }catch(e){}
-        });
+        // 🚀 只保留純音效，動畫交給時間軸重繪系統 🚀
+        socket.on('player_blackjack', () => { try { sfx.bj(); } catch(e){} });
+        socket.on('player_double_down', () => { try { sfx.dd(); } catch(e){} });
+        socket.on('player_bust', () => { try { sfx.bust(); } catch(e){} });
 
         socket.on('hand_settled_animation', (data) => {
             try {
@@ -728,16 +704,40 @@
                         
                         let waitingMsg = (seat.state === 'waiting_next' && globalState.status === 'playing') ? `<div style="position:absolute; top:40%; color:rgba(255,255,255,0.5); font-weight:bold; width:100%; text-align:center;">⏳ 等待下局</div>` : '';
                         
+                        // 🚀 完美的動畫時間軸記憶系統 🚀
                         let bustClass = '';
+                        let bustStampHtml = '';
                         if (seat.state === 'bust') {
                             bustClass = 'seat-bust-static';
-                            if (!knownBusts.has(i)) {
-                                bustClass += ' seat-bust-anim';
-                                knownBusts.add(i);
+                            if (!knownBusts.has(i)) knownBusts.set(i, Date.now());
+                            let age = Date.now() - knownBusts.get(i);
+                            if (age < 1000) {
+                                bustStampHtml = `<div class="bust-stamp" style="animation: stamp-drop 0.4s ease-in forwards; animation-delay: -${age}ms;">BUST</div>`;
+                                if (age < 600) bustClass += ' seat-bust-anim';
+                            } else {
+                                bustStampHtml = `<div class="bust-stamp" style="opacity: 1; transform: translate(-50%, -50%) rotate(-15deg) scale(1);">BUST</div>`;
+                            }
+                        }
+
+                        let isBJ = (seat.cards && seat.cards.length === 2 && seat.score === 21);
+                        let bjHtml = '';
+                        if (isBJ) {
+                            if (!knownBJs.has(i)) knownBJs.set(i, Date.now());
+                            let age = Date.now() - knownBJs.get(i);
+                            if (age < 3000) {
+                                bjHtml = `<div class="bj-anim" style="animation: bj-pop 3s forwards; animation-delay: -${age}ms;">✨ BLACKJACK</div>`;
                             }
                         }
 
                         let doubleClass = seat.isDoubleDown ? 'seat-double-down' : '';
+                        let ddHtml = '';
+                        if (seat.isDoubleDown) {
+                            if (!knownDDs.has(i)) knownDDs.set(i, Date.now());
+                            let age = Date.now() - knownDDs.get(i);
+                            if (age < 3000) {
+                                ddHtml = `<div class="dd-anim" style="animation: dd-pop 3s forwards; animation-delay: -${age}ms;">✖️2 DOUBLE!</div>`;
+                            }
+                        }
 
                         let isBehindSelected = (selectedBetTarget && selectedBetTarget.type === 'behind' && selectedBetTarget.index === i);
                         let behindActiveClass = isBehindSelected ? 'selected-for-bet' : '';
@@ -779,9 +779,9 @@
                         seatsHtml += `
                             <div class="seat ${activeClass} ${bustClass} ${doubleClass}" id="seat_${i}" onclick="handleSeatClick(${i})">
                             ${scoreBadge}
-                            <div class="bj-anim" id="seat_bj_${i}"></div>
-                            <div class="dd-anim" id="seat_dd_${i}"></div>
-                            <div class="bust-stamp">BUST</div>
+                            ${bjHtml}
+                            ${ddHtml}
+                            ${bustStampHtml}
                             ${othersBehindHtml}
                             <div class="card-container" style="min-height:75px;">${cardsHtml}</div>
                             ${waitingMsg}
@@ -806,7 +806,12 @@
                 amIHost = (state.hostId === socket.id);
                 currentStatus = state.status;
 
-                if (state.status === 'betting') knownBusts.clear();
+                // 新局清空動畫記憶
+                if (state.status === 'betting') {
+                    knownBusts.clear();
+                    knownBJs.clear();
+                    knownDDs.clear();
+                }
 
                 if(document.getElementById('deckCountDisplay')) document.getElementById('deckCountDisplay').innerText = state.deck.length;
                 if(document.getElementById('myBalanceDisplay')) document.getElementById('myBalanceDisplay').innerText = me.balance;
@@ -833,18 +838,21 @@
                     selectedBetTarget = null; 
                 }
 
+                // 🚀 莊家專屬天眼：玩家餘額顯示 🚀
                 let pnlHtml = '';
                 for(let id in state.players) {
                     let p = state.players[id];
                     let role = id === state.dealerId ? '👑' : '👤';
                     let pColor = p.pnl >= 0 ? 'text-win' : 'text-lose';
-                    pnlHtml += `<div class="pnl-item"><span>${role} ${p.name}</span><span class="${pColor}">${p.pnl>0?'+':''}${p.pnl}</span></div>`;
+                    let balInfo = amIDealer ? ` <span style="color:#aaa; font-size:0.85em; font-weight:normal;">($${p.balance})</span>` : '';
+                    pnlHtml += `<div class="pnl-item"><span>${role} ${p.name}${balInfo}</span><span class="${pColor}">${p.pnl>0?'+':''}${p.pnl}</span></div>`;
                 }
                 if(state.offlinePlayers) {
                     state.offlinePlayers.forEach(p => {
                         let role = p.oldId === state.dealerId ? '👑' : '👤';
                         let pColor = p.pnl >= 0 ? 'text-win' : 'text-lose';
-                        pnlHtml += `<div class="pnl-item" style="color:#666; font-style:italic;"><span>${role} ${p.name} (💤)</span><span class="${pColor}">${p.pnl>0?'+':''}${p.pnl}</span></div>`;
+                        let balInfo = amIDealer ? ` <span style="color:#aaa; font-size:0.85em; font-weight:normal;">($${p.balance})</span>` : '';
+                        pnlHtml += `<div class="pnl-item" style="color:#666; font-style:italic;"><span>${role} ${p.name} (💤)${balInfo}</span><span class="${pColor}">${p.pnl>0?'+':''}${p.pnl}</span></div>`;
                     });
                 }
                 if(document.getElementById('playerList')) document.getElementById('playerList').innerHTML = pnlHtml;
@@ -892,7 +900,6 @@
                     if(document.getElementById('settleModal')) document.getElementById('settleModal').style.display = 'none';
                 }
 
-                // 🚀 修復：顯示總結算按鈕 🚀
                 if(document.getElementById('adminControls')) {
                     document.getElementById('adminControls').style.display = (amIDealer && (state.status === 'waiting' || state.status === 'settled')) ? 'flex' : 'none';
                 }
